@@ -2,7 +2,7 @@
   "name": "Radio · BTC",
   "short_name": "Radio BTC",
   "description": "Joe Nederland & SWR3 Livestream mit Bitcoin-Kurs, Kursverlauf und Regen-Countdown",
-  "start_url": "./radio-player.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0a0a",
