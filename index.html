@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Radio · ₿TC</title>
+<style>
+  :root{
+    --btc-orange:#f7931a;
+    --btc-orange-dim:#8a5410;
+    --bg-0:#0a0a0a;
+    --bg-1:#131313;
+    --bg-2:#1a1a1a;
+    --line:#2b2b2b;
+    --off-white:#f0ede6;
+    --dim:#7a7a7a;
+    --green:#4caf50;
+    --red:#e5484d;
+    --blue:#4a9de0;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 50% 0%, #1c1409 0%, var(--bg-0) 60%);
+    color:var(--off-white);
+    font-family:'Courier New', ui-monospace, monospace;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  /* ===== CLOCK BAR ===== */
+  .clock-bar{
+    width:100%;
+    background:linear-gradient(180deg,#0d0d0d,#000);
+    border-bottom:1px solid var(--btc-orange-dim);
+    padding:14px 10px 12px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .clock-bar::before{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(247,147,26,.035) 0 1px, transparent 1px 34px);
+    pointer-events:none;
+  }
+  .clock-time{
+    font-size:clamp(34px,10vw,58px);
+    font-weight:700;
+    letter-spacing:.04em;
+    color:var(--off-white);
+    line-height:1;
+    font-variant-numeric:tabular-nums;
+    text-shadow:0 0 18px rgba(247,147,26,.25);
+  }
+  .clock-time .colon{
+    color:var(--btc-orange);
+    animation:blink 2s steps(1) infinite;
+  }
+  @keyframes blink{50%{opacity:.25;}}
+  .clock-date{
+    margin-top:2px;
+    font-size:11px;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--dim);
+  }
+
+  /* ===== WEATHER / RAIN BAR ===== */
+  .weather-bar{
+    width:100%;
+    background:linear-gradient(180deg,#0d0d0d,#050505);
+    border-bottom:1px solid var(--line);
+    padding:10px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+  }
+  .weather-bar .bike-icon{
+    color:var(--dim);
+    flex-shrink:0;
+    width:24px;height:24px;
+  }
+  .weather-bar .bike-icon svg{width:100%;height:100%;}
+  .rain-info{
+    flex:1;
+    max-width:280px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+  }
+  .rain-label{
+    font-size:9px;
+    letter-spacing:.15em;
+    text-transform:uppercase;
+    color:var(--dim);
+    margin-bottom:2px;
+  }
+  .rain-countdown{
+    font-size:18px;
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    color:var(--off-white);
+    letter-spacing:.03em;
+  }
+  .rain-countdown.no-rain{
+    font-size:13px;
+    font-weight:400;
+    color:var(--dim);
+  }
+  .rain-countdown.now{
+    color:var(--blue);
+  }
+  .weather-icon{
+    flex-shrink:0;
+    width:26px;height:26px;
+    transition:color .3s;
+  }
+  .weather-icon svg{width:100%;height:100%;}
+  .weather-icon.rain{color:var(--blue);}
+  .weather-icon.sun{color:var(--btc-orange);}
+  .weather-icon.unknown{color:var(--dim);}
+
+  /* ===== MAIN CONTENT ===== */
+  .content{
+    width:100%;
+    max-width:460px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    padding:20px 20px 0;
+    flex:1;
+  }
+
+  .set{
+    width:100%;
+    background:linear-gradient(180deg,#161613,#101010);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:24px 22px 26px;
+    box-shadow:0 24px 50px -20px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.03);
+    position:relative;
+  }
+
+  .brand{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:20px;
+    letter-spacing:.12em;
+  }
+  .brand .name{
+    font-size:12px;
+    text-transform:uppercase;
+    color:var(--btc-orange);
+    font-weight:700;
+  }
+  .brand .status{
+    font-size:10px;
+    color:var(--dim);
+    display:flex;
+    align-items:center;
+    gap:6px;
+    text-transform:uppercase;
+  }
+  .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:#4a4a44;
+    transition:background .3s, box-shadow .3s;
+  }
+  .dot.live{
+    background:var(--green);
+    box-shadow:0 0 8px var(--green);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+  .station{
+    width:100%;
+    display:block;
+    text-align:left;
+    background:#0f0f0d;
+    border:1px solid #232320;
+    border-radius:12px;
+    padding:16px 18px;
+    margin-bottom:12px;
+    cursor:pointer;
+    color:var(--off-white);
+    font-family:inherit;
+    position:relative;
+    overflow:hidden;
+    transition:border-color .2s, background .2s;
+  }
+  .station:last-of-type{margin-bottom:0;}
+  .station:active{transform:scale(.99);}
+  .station .row{display:flex;align-items:center;justify-content:space-between;}
+  .station .label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#75756f;margin-bottom:4px;}
+  .station .title{font-size:19px;font-weight:700;letter-spacing:.02em;}
+  .station .freq{font-size:12px;color:var(--btc-orange-dim);letter-spacing:.05em;white-space:nowrap;}
+  .station.active{
+    border-color:var(--btc-orange);
+    background:linear-gradient(90deg, rgba(247,147,26,.12), transparent);
+  }
+  .station.active .freq{color:var(--btc-orange);}
+  .needle{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--btc-orange);opacity:0;transition:opacity .2s;}
+  .station.active .needle{opacity:1;}
+
+  .controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:18px;}
+  .now-playing{flex:1;min-width:0;}
+  .now-playing .label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#75756f;}
+  .now-playing .title{font-size:15px;font-weight:700;color:var(--off-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .now-playing .title.muted{color:#4f4f4a;}
+
+  .play-btn{
+    flex-shrink:0;width:58px;height:58px;border-radius:50%;
+    border:1px solid var(--btc-orange-dim);
+    background:radial-gradient(circle at 35% 30%, #241a0c, #131110);
+    color:var(--btc-orange);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;transition:border-color .2s, transform .1s;
+  }
+  .play-btn:active{transform:scale(.94);}
+  .play-btn.playing{border-color:var(--btc-orange);box-shadow:0 0 0 4px rgba(247,147,26,.1);}
+  .play-btn svg{width:22px;height:22px;}
+
+  /* ===== BTC PRICE TICKER ===== */
+  .btc-ticker{
+    width:100%;
+    background:linear-gradient(180deg,#161613,#101010);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:18px 22px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    box-shadow:0 24px 50px -20px rgba(0,0,0,.8);
+  }
+  .btc-ticker .left{display:flex;align-items:center;gap:12px;}
+  .btc-symbol{
+    width:38px;height:38px;border-radius:50%;
+    background:var(--btc-orange);
+    color:#0a0a0a;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:900;font-size:20px;flex-shrink:0;
+    box-shadow:0 0 16px rgba(247,147,26,.4);
+  }
+  .btc-label{
+    font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);margin-bottom:3px;
+  }
+  .btc-price{
+    font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.01em;
+  }
+  .btc-price.loading{color:var(--dim);font-size:14px;font-weight:400;}
+  .btc-change{
+    font-size:13px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;
+  }
+  .btc-change.up{color:var(--green);}
+  .btc-change.down{color:var(--red);}
+  .btc-change .arrow{font-size:11px;}
+
+  /* ===== CHART ===== */
+  .btc-chart-wrap{
+    width:100%;
+    background:linear-gradient(180deg,#161613,#101010);
+    border:1px solid var(--line);
+    border-radius:16px 16px 0 0;
+    padding:18px 22px 0;
+    box-shadow:0 -10px 40px -25px rgba(247,147,26,.15);
+    flex-shrink:0;
+  }
+  .chart-header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:6px;
+  }
+  .chart-title{font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);}
+  .chart-range{font-size:10px;letter-spacing:.1em;color:var(--btc-orange-dim);}
+  .chart-svg-holder{width:100%;height:130px;position:relative;}
+  .chart-svg-holder svg{width:100%;height:100%;display:block;}
+  .chart-loading{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--dim);letter-spacing:.1em;
+  }
+  .chart-footline{
+    display:flex;justify-content:space-between;
+    font-size:9px;color:#5a5a55;
+    padding:2px 0 12px;
+    letter-spacing:.05em;
+  }
+
+  @media (max-width:380px){
+    .set{padding:20px 16px 22px;}
+    .station .title{font-size:17px;}
+    .btc-ticker{padding:14px 16px;}
+    .btc-price{font-size:20px;}
+    .rain-countdown{font-size:16px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="clock-bar">
+  <div class="clock-time" id="clockTime">--:--:--</div>
+  <div class="clock-date" id="clockDate">-</div>
+</div>
+
+<div class="weather-bar">
+  <div class="bike-icon" title="Radtour-Wetter">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="5.5" cy="17.5" r="3.5"/>
+      <circle cx="18.5" cy="17.5" r="3.5"/>
+      <circle cx="15" cy="5" r="1"/>
+      <path d="M12 17.5V14l-3-3 4-3 2 3h3"/>
+    </svg>
+  </div>
+
+  <div class="rain-info">
+    <div class="rain-label" id="rainLabel">Regen-Countdown</div>
+    <div class="rain-countdown no-rain" id="rainCountdown">suche Standort…</div>
+  </div>
+
+  <div class="weather-icon unknown" id="weatherIcon">
+    <!-- filled dynamically -->
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="set">
+    <div class="brand">
+      <span class="name">Radio</span>
+      <span class="status"><span class="dot" id="liveDot"></span><span id="statusText">Bereit</span></span>
+    </div>
+
+    <button class="station" id="btnJoe" data-station="joe">
+      <div class="needle"></div>
+      <div class="row">
+        <div>
+          <div class="label">Niederlande</div>
+          <div class="title">Joe Nederland</div>
+        </div>
+        <div class="freq">HITS 70•80•90</div>
+      </div>
+    </button>
+
+    <button class="station" id="btnSwr3" data-station="swr3">
+      <div class="needle"></div>
+      <div class="row">
+        <div>
+          <div class="label">Deutschland</div>
+          <div class="title">SWR3</div>
+        </div>
+        <div class="freq">MEHR HITS</div>
+      </div>
+    </button>
+
+    <div class="controls">
+      <div class="now-playing">
+        <div class="label">Läuft</div>
+        <div class="title muted" id="nowPlaying">Kein Sender gewählt</div>
+      </div>
+      <button class="play-btn" id="playBtn" aria-label="Play/Pause" disabled>
+        <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="btc-ticker">
+    <div class="left">
+      <div class="btc-symbol">₿</div>
+      <div>
+        <div class="btc-label">BTC / EUR</div>
+        <div class="btc-price loading" id="btcPrice">lädt…</div>
+      </div>
+    </div>
+    <div class="btc-change" id="btcChange"></div>
+  </div>
+
+</div>
+
+<div class="btc-chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">Kursverlauf</span>
+    <span class="chart-range" id="chartRange">seit 01.04.2026</span>
+  </div>
+  <div class="chart-svg-holder">
+    <div class="chart-loading" id="chartLoading">lädt Verlauf…</div>
+    <svg id="chartSvg" viewBox="0 0 600 130" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="chart-footline">
+    <span id="chartMin">–</span>
+    <span id="chartMax">–</span>
+  </div>
+</div>
+
+<audio id="audio" preload="none"></audio>
+
+<script>
+  /* ============ RADIO ============ */
+  const STATIONS = {
+    joe:  { name: "Joe Nederland", url: "https://stream.joe.nl/joe/mp3" },
+    swr3: { name: "SWR3",          url: "https://liveradio.swr.de/sw282p3/swr3/play.mp3" }
+  };
+
+  const audio = document.getElementById('audio');
+  const playBtn = document.getElementById('playBtn');
+  const playIcon = document.getElementById('playIcon');
+  const pauseIcon = document.getElementById('pauseIcon');
+  const nowPlaying = document.getElementById('nowPlaying');
+  const statusText = document.getElementById('statusText');
+  const liveDot = document.getElementById('liveDot');
+  const btnJoe = document.getElementById('btnJoe');
+  const btnSwr3 = document.getElementById('btnSwr3');
+  const stationButtons = { joe: btnJoe, swr3: btnSwr3 };
+
+  let currentStation = null;
+  audio.setAttribute('playsinline', '');
+
+  function setActiveButton(key){
+    Object.entries(stationButtons).forEach(([k, el]) => el.classList.toggle('active', k === key));
+  }
+
+  function updateStatus(){
+    if (audio.paused) {
+      statusText.textContent = currentStation ? 'Pausiert' : 'Bereit';
+      liveDot.classList.remove('live');
+      playIcon.style.display = '';
+      pauseIcon.style.display = 'none';
+      playBtn.classList.remove('playing');
+    } else {
+      statusText.textContent = 'Live';
+      liveDot.classList.add('live');
+      playIcon.style.display = 'none';
+      pauseIcon.style.display = '';
+      playBtn.classList.add('playing');
+    }
+  }
+
+  function updateNowPlaying(){
+    if (currentStation) {
+      nowPlaying.textContent = STATIONS[currentStation].name;
+      nowPlaying.classList.remove('muted');
+    } else {
+      nowPlaying.textContent = 'Kein Sender gewählt';
+      nowPlaying.classList.add('muted');
+    }
+  }
+
+  function updateMediaSession(){
+    if (!('mediaSession' in navigator)) return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentStation ? STATIONS[currentStation].name : 'Radio',
+      artist: 'Livestream',
+    });
+    navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
+  }
+
+  function playStation(key){
+    const station = STATIONS[key];
+    if (!station) return;
+    if (currentStation === key) { togglePlay(); return; }
+
+    currentStation = key;
+    audio.src = station.url;
+    audio.load();
+    statusText.textContent = 'Verbinde…';
+    setActiveButton(key);
+    updateNowPlaying();
+    playBtn.disabled = false;
+
+    audio.play().then(() => {
+      updateStatus();
+      updateMediaSession();
+    }).catch(() => { statusText.textContent = 'Fehler'; });
+  }
+
+  function togglePlay(){
+    if (!currentStation) return;
+    if (audio.paused) {
+      audio.play().catch(() => { statusText.textContent = 'Fehler'; });
+    } else {
+      audio.pause();
+    }
+  }
+
+  btnJoe.addEventListener('click', () => playStation('joe'));
+  btnSwr3.addEventListener('click', () => playStation('swr3'));
+  playBtn.addEventListener('click', togglePlay);
+
+  audio.addEventListener('play', () => { updateStatus(); updateMediaSession(); });
+  audio.addEventListener('pause', () => { updateStatus(); updateMediaSession(); });
+  audio.addEventListener('waiting', () => { statusText.textContent = 'Puffert…'; });
+  audio.addEventListener('playing', () => { updateStatus(); });
+  audio.addEventListener('error', () => { statusText.textContent = 'Fehler'; liveDot.classList.remove('live'); });
+
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', () => audio.play().catch(()=>{}));
+    navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+  }
+
+  updateStatus();
+  updateNowPlaying();
+
+  /* ============ CLOCK ============ */
+  const clockTime = document.getElementById('clockTime');
+  const clockDate = document.getElementById('clockDate');
+  const weekdays = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+
+  function pad(n){ return n.toString().padStart(2,'0'); }
+
+  function tickClock(){
+    const now = new Date();
+    const h = pad(now.getHours()), m = pad(now.getMinutes()), s = pad(now.getSeconds());
+    clockTime.innerHTML = `${h}<span class="colon">:</span>${m}<span class="colon">:</span>${s}`;
+    clockDate.textContent = `${weekdays[now.getDay()]} · ${pad(now.getDate())}.${pad(now.getMonth()+1)}.${now.getFullYear()}`;
+  }
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  /* ============ WEATHER / RAIN COUNTDOWN ============ */
+  const rainLabel = document.getElementById('rainLabel');
+  const rainCountdownEl = document.getElementById('rainCountdown');
+  const weatherIconEl = document.getElementById('weatherIcon');
+
+  const ICON_RAIN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 16.58A5 5 0 0018 7h-1.26A8 8 0 104 15.25"/>
+      <line x1="8" y1="19" x2="8" y2="21.5"/>
+      <line x1="12" y1="19" x2="12" y2="21.5"/>
+      <line x1="16" y1="19" x2="16" y2="21.5"/>
+    </svg>`;
+  const ICON_SUN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="1" x2="12" y2="3"/>
+      <line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/>
+      <line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>`;
+  const ICON_CLOUD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17.5 19a4.5 4.5 0 000-9h-1.26A8 8 0 104 16.25"/>
+    </svg>`;
+
+  let rainTargetTime = null;   // Date object, or null if no rain today
+  let isRainingNow = false;
+
+  function setWeatherIcon(kind){
+    weatherIconEl.classList.remove('rain','sun','unknown');
+    if (kind === 'rain') {
+      weatherIconEl.innerHTML = ICON_RAIN;
+      weatherIconEl.classList.add('rain');
+    } else if (kind === 'sun') {
+      weatherIconEl.innerHTML = ICON_SUN;
+      weatherIconEl.classList.add('sun');
+    } else if (kind === 'cloud') {
+      weatherIconEl.innerHTML = ICON_CLOUD;
+      weatherIconEl.classList.add('unknown');
+    } else {
+      weatherIconEl.innerHTML = '';
+    }
+  }
+
+  function formatCountdown(ms){
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${pad(m)}:${pad(s)}`;
+    return `${pad(m)}:${pad(s)}`;
+  }
+
+  function tickRain(){
+    if (isRainingNow) {
+      rainLabel.textContent = 'Aktuell';
+      rainCountdownEl.textContent = 'Es regnet gerade';
+      rainCountdownEl.className = 'rain-countdown now';
+      setWeatherIcon('rain');
+      return;
+    }
+    if (!rainTargetTime) {
+      rainLabel.textContent = 'Regen-Countdown';
+      rainCountdownEl.textContent = 'Heute kein Regen erwartet';
+      rainCountdownEl.className = 'rain-countdown no-rain';
+      setWeatherIcon('sun');
+      return;
+    }
+    const diff = rainTargetTime.getTime() - Date.now();
+    if (diff <= 0) {
+      isRainingNow = true;
+      tickRain();
+      return;
+    }
+    rainLabel.textContent = 'Regen in';
+    rainCountdownEl.textContent = formatCountdown(diff);
+    rainCountdownEl.className = 'rain-countdown';
+    setWeatherIcon('rain');
+  }
+
+  async function loadWeather(lat, lon){
+    try {
+      rainLabel.textContent = 'Regen-Countdown';
+      rainCountdownEl.textContent = 'lädt Wetter…';
+      rainCountdownEl.className = 'rain-countdown no-rain';
+      setWeatherIcon('cloud');
+
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation_probability,precipitation&forecast_days=2&timezone=auto`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const times = data.hourly.time;
+      const probs = data.hourly.precipitation_probability;
+      const precs = data.hourly.precipitation;
+
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+
+      rainTargetTime = null;
+      isRainingNow = false;
+
+      for (let i = 0; i < times.length; i++) {
+        const t = new Date(times[i]);
+        const key = `${t.getFullYear()}-${pad(t.getMonth()+1)}-${pad(t.getDate())}`;
+        if (key !== todayKey) continue;
+
+        const rainLikely = (probs[i] !== undefined && probs[i] >= 50) || (precs[i] !== undefined && precs[i] >= 0.2);
+        if (!rainLikely) continue;
+
+        const hourEnd = new Date(t.getTime() + 60 * 60 * 1000);
+        if (hourEnd.getTime() <= now.getTime()) continue; // this hour already over
+
+        if (t.getTime() <= now.getTime()) {
+          // currently within this rainy hour
+          isRainingNow = true;
+          rainTargetTime = null;
+        } else {
+          rainTargetTime = t;
+        }
+        break;
+      }
+
+      tickRain();
+    } catch (e) {
+      rainLabel.textContent = 'Regen-Countdown';
+      rainCountdownEl.textContent = 'Wetter nicht verfügbar';
+      rainCountdownEl.className = 'rain-countdown no-rain';
+      setWeatherIcon('cloud');
+    }
+  }
+
+  function initWeather(){
+    if (!('geolocation' in navigator)) {
+      fallbackIpLocation();
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        loadWeather(pos.coords.latitude, pos.coords.longitude);
+        setInterval(() => loadWeather(pos.coords.latitude, pos.coords.longitude), 10 * 60 * 1000);
+      },
+      () => { fallbackIpLocation(); },
+      { enableHighAccuracy:false, timeout:8000, maximumAge:600000 }
+    );
+  }
+
+  async function fallbackIpLocation(){
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      const data = await res.json();
+      if (data && data.latitude && data.longitude) {
+        loadWeather(data.latitude, data.longitude);
+        setInterval(() => loadWeather(data.latitude, data.longitude), 10 * 60 * 1000);
+      } else {
+        throw new Error('no location');
+      }
+    } catch (e) {
+      rainCountdownEl.textContent = 'Standort nicht verfügbar';
+      rainCountdownEl.className = 'rain-countdown no-rain';
+      setWeatherIcon('cloud');
+    }
+  }
+
+  initWeather();
+  setInterval(tickRain, 1000);
+
+  /* ============ BITCOIN PRICE ============ */
+  const btcPriceEl = document.getElementById('btcPrice');
+  const btcChangeEl = document.getElementById('btcChange');
+  let lastPrice = null;
+
+  async function fetchBtcPrice(){
+    try {
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur&include_24hr_change=true');
+      const data = await res.json();
+      const price = data.bitcoin.eur;
+      const change24h = data.bitcoin.eur_24h_change;
+
+      btcPriceEl.classList.remove('loading');
+      btcPriceEl.textContent = '€ ' + price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+      if (typeof change24h === 'number') {
+        const up = change24h >= 0;
+        btcChangeEl.className = 'btc-change ' + (up ? 'up' : 'down');
+        btcChangeEl.innerHTML = `<span class="arrow">${up ? '▲' : '▼'}</span> ${up ? '+' : ''}${change24h.toFixed(2)}% <span style="color:var(--dim);font-weight:400;">24h</span>`;
+      }
+      lastPrice = price;
+    } catch (e) {
+      if (lastPrice === null) {
+        btcPriceEl.textContent = 'nicht verfügbar';
+      }
+    }
+  }
+  fetchBtcPrice();
+  setInterval(fetchBtcPrice, 10000);
+
+  /* ============ BITCOIN CHART ============ */
+  const chartSvg = document.getElementById('chartSvg');
+  const chartLoading = document.getElementById('chartLoading');
+  const chartMin = document.getElementById('chartMin');
+  const chartMax = document.getElementById('chartMax');
+
+  const CHART_START = new Date('2026-04-01T00:00:00Z').getTime() / 1000;
+
+  function renderChart(points){
+    if (!points || points.length < 2) return;
+
+    const prices = points.map(p => p[1]);
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const range = (maxP - minP) || 1;
+
+    const W = 600, H = 130, PAD = 6;
+    const n = points.length;
+
+    const coords = points.map((p, i) => {
+      const x = (i / (n - 1)) * (W - PAD * 2) + PAD;
+      const y = H - PAD - ((p[1] - minP) / range) * (H - PAD * 2);
+      return [x, y];
+    });
+
+    const linePath = coords.map((c, i) => (i === 0 ? 'M' : 'L') + c[0].toFixed(2) + ',' + c[1].toFixed(2)).join(' ');
+    const areaPath = linePath + ` L${coords[coords.length-1][0].toFixed(2)},${H} L${coords[0][0].toFixed(2)},${H} Z`;
+
+    const strokeColor = '#f7931a';
+
+    chartSvg.innerHTML = `
+      <defs>
+        <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaPath}" fill="url(#areaFill)" stroke="none"/>
+      <path d="${linePath}" fill="none" stroke="${strokeColor}" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    `;
+
+    chartMin.textContent = '€ ' + minP.toLocaleString('de-DE', {maximumFractionDigits:0});
+    chartMax.textContent = '€ ' + maxP.toLocaleString('de-DE', {maximumFractionDigits:0});
+    chartLoading.style.display = 'none';
+  }
+
+  async function fetchBtcHistory(){
+    try {
+      const to = Math.floor(Date.now() / 1000);
+      const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=eur&from=${CHART_START}&to=${to}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.prices && data.prices.length) {
+        renderChart(data.prices);
+      }
+    } catch (e) {
+      chartLoading.textContent = 'Verlauf nicht verfügbar';
+    }
+  }
+  fetchBtcHistory();
+  setInterval(fetchBtcHistory, 10000);
+</script>
+</body>
+</html>
