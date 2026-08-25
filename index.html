@@ -231,17 +231,20 @@
   .play-btn.playing{border-color:var(--btc-orange);box-shadow:0 0 0 4px rgba(247,147,26,.1);}
   .play-btn svg{width:22px;height:22px;}
 
-  /* ===== BTC PRICE TICKER ===== */
-  .btc-ticker{
+  /* ===== BTC CARD (price + chart together) ===== */
+  .btc-card{
     width:100%;
     background:linear-gradient(180deg,#161613,#101010);
     border:1px solid var(--line);
     border-radius:16px;
-    padding:18px 22px;
+    padding:18px 22px 4px;
+    box-shadow:0 24px 50px -20px rgba(0,0,0,.8);
+  }
+  .btc-ticker{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    box-shadow:0 24px 50px -20px rgba(0,0,0,.8);
+    padding-bottom:16px;
   }
   .btc-ticker .left{display:flex;align-items:center;gap:12px;}
   .btc-symbol{
@@ -266,15 +269,11 @@
   .btc-change.down{color:var(--red);}
   .btc-change .arrow{font-size:11px;}
 
-  /* ===== CHART ===== */
+  /* ===== CHART (inside the BTC card) ===== */
   .btc-chart-wrap{
     width:100%;
-    background:linear-gradient(180deg,#161613,#101010);
-    border:1px solid var(--line);
-    border-radius:16px 16px 0 0;
-    padding:18px 22px 0;
-    box-shadow:0 -10px 40px -25px rgba(247,147,26,.15);
-    flex-shrink:0;
+    border-top:1px solid var(--line);
+    padding:14px 0 0;
   }
   .chart-header{
     display:flex;
@@ -293,14 +292,14 @@
   .chart-footline{
     display:flex;justify-content:space-between;
     font-size:9px;color:#5a5a55;
-    padding:2px 0 12px;
+    padding:2px 0 16px;
     letter-spacing:.05em;
   }
 
   @media (max-width:380px){
     .set{padding:20px 16px 22px;}
     .station .title{font-size:17px;}
-    .btc-ticker{padding:14px 16px;}
+    .btc-card{padding:14px 16px 4px;}
     .btc-price{font-size:20px;}
     .rain-countdown{font-size:16px;}
   }
@@ -375,32 +374,34 @@
     </div>
   </div>
 
-  <div class="btc-ticker">
-    <div class="left">
-      <div class="btc-symbol">₿</div>
-      <div>
-        <div class="btc-label">BTC / EUR</div>
-        <div class="btc-price loading" id="btcPrice">lädt…</div>
+  <div class="btc-card">
+    <div class="btc-ticker">
+      <div class="left">
+        <div class="btc-symbol">₿</div>
+        <div>
+          <div class="btc-label">BTC / EUR</div>
+          <div class="btc-price loading" id="btcPrice">lädt…</div>
+        </div>
+      </div>
+      <div class="btc-change" id="btcChange"></div>
+    </div>
+
+    <div class="btc-chart-wrap">
+      <div class="chart-header">
+        <span class="chart-title">Kursverlauf</span>
+        <span class="chart-range" id="chartRange">seit 01.04.2026</span>
+      </div>
+      <div class="chart-svg-holder">
+        <div class="chart-loading" id="chartLoading">lädt Verlauf…</div>
+        <svg id="chartSvg" viewBox="0 0 600 130" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="chart-footline">
+        <span id="chartMin">–</span>
+        <span id="chartMax">–</span>
       </div>
     </div>
-    <div class="btc-change" id="btcChange"></div>
   </div>
 
-</div>
-
-<div class="btc-chart-wrap">
-  <div class="chart-header">
-    <span class="chart-title">Kursverlauf</span>
-    <span class="chart-range" id="chartRange">seit 01.04.2026</span>
-  </div>
-  <div class="chart-svg-holder">
-    <div class="chart-loading" id="chartLoading">lädt Verlauf…</div>
-    <svg id="chartSvg" viewBox="0 0 600 130" preserveAspectRatio="none"></svg>
-  </div>
-  <div class="chart-footline">
-    <span id="chartMin">–</span>
-    <span id="chartMax">–</span>
-  </div>
 </div>
 
 <audio id="audio" preload="none"></audio>
