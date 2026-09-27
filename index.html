@@ -31,6 +31,7 @@
     --green:#4caf50;
     --red:#e5484d;
     --blue:#4a9de0;
+    --digit-size:clamp(34px,10vw,58px);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
@@ -78,7 +79,7 @@
     align-items:center;
   }
   .clock-time{
-    font-size:clamp(34px,10vw,58px);
+    font-size:var(--digit-size);
     font-weight:700;
     letter-spacing:.04em;
     color:var(--off-white);
@@ -101,12 +102,13 @@
 
   /* ===== COMPASS / GESCHWINDIGKEIT ===== */
   .compass-wrap{
-    width:64px;height:64px;
+    width:calc(var(--digit-size) * 2.15);
+    height:calc(var(--digit-size) * 2.15);
     flex-shrink:0;
     position:relative;
     cursor:pointer;
   }
-  .compass-wrap svg{width:100%;height:100%;display:block;overflow:visible;}
+  .compass-wrap svg{width:100%;height:100%;display:block;position:absolute;inset:0;}
   .compass-ring{
     fill:rgba(255,255,255,.02);
     stroke:var(--line);
@@ -117,7 +119,7 @@
     stroke-width:1;
   }
   .compass-letter{
-    font-size:8.5px;
+    font-size:9px;
     font-weight:700;
     font-family:inherit;
     fill:var(--dim);
@@ -129,23 +131,37 @@
     fill:var(--btc-orange);
     filter:drop-shadow(0 0 3px rgba(247,147,26,.6));
     transition:transform .15s ease-out;
-    transform-origin:32px 32px;
+  }
+  .compass-wrap.needs-permission .compass-ring{
+    stroke-dasharray:3 3;
+    animation:compassPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes compassPulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .compass-speed{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    pointer-events:none;
   }
   .compass-speed-val{
-    font-size:15px;
+    font-size:var(--digit-size);
     font-weight:700;
-    font-family:inherit;
-    fill:var(--off-white);
-    text-anchor:middle;
+    letter-spacing:.02em;
+    color:var(--off-white);
+    line-height:1;
     font-variant-numeric:tabular-nums;
+    text-shadow:0 0 18px rgba(247,147,26,.25);
   }
   .compass-speed-unit{
-    font-size:6.5px;
+    margin-top:1px;
+    font-size:9px;
     font-weight:400;
-    font-family:inherit;
-    fill:var(--dim);
-    letter-spacing:.08em;
-    text-anchor:middle;
+    color:var(--dim);
+    letter-spacing:.1em;
+    text-transform:uppercase;
   }
 
   /* ===== WEATHER / RAIN BAR ===== */
@@ -378,7 +394,6 @@
     .btc-card{padding:14px 16px 4px;}
     .btc-price{font-size:20px;}
     .rain-countdown{font-size:16px;}
-    .compass-wrap{width:52px;height:52px;}
     .clock-row{gap:10px;}
   }
 </style>
@@ -388,28 +403,30 @@
 <div class="clock-bar">
   <div class="clock-row">
     <div class="compass-wrap" id="compassWrap" title="Kompass &amp; Geschwindigkeit aktivieren">
-      <svg viewBox="0 0 64 64">
-        <circle class="compass-ring" cx="32" cy="32" r="29"/>
+      <svg viewBox="0 0 100 100">
+        <circle class="compass-ring" cx="50" cy="50" r="47"/>
         <!-- kleine Teilstriche alle 30° -->
         <g class="compass-ticks">
-          <line class="compass-tick" x1="32" y1="4"  x2="32" y2="8"/>
-          <line class="compass-tick" x1="32" y1="56" x2="32" y2="60"/>
-          <line class="compass-tick" x1="4"  y1="32" x2="8"  y2="32"/>
-          <line class="compass-tick" x1="56" y1="32" x2="60" y2="32"/>
+          <line class="compass-tick" x1="50" y1="4"  x2="50" y2="9"/>
+          <line class="compass-tick" x1="50" y1="91" x2="50" y2="96"/>
+          <line class="compass-tick" x1="4"  y1="50" x2="9"  y2="50"/>
+          <line class="compass-tick" x1="91" y1="50" x2="96" y2="50"/>
         </g>
         <!-- Himmelsrichtungen, Kompasskreis stets nach Norden ausgerichtet -->
-        <text class="compass-letter is-north" x="32" y="13">N</text>
-        <text class="compass-letter" x="51" y="32">O</text>
-        <text class="compass-letter" x="32" y="51">S</text>
-        <text class="compass-letter" x="13" y="32">W</text>
+        <text class="compass-letter is-north" x="50" y="19">N</text>
+        <text class="compass-letter" x="81" y="51">O</text>
+        <text class="compass-letter" x="50" y="83">S</text>
+        <text class="compass-letter" x="19" y="51">W</text>
         <!-- Peilungssymbol: rotiert je nach Ausrichtung des Smartphones -->
-        <g id="compassMarker" class="compass-marker" transform="rotate(0 32 32)">
-          <polygon points="32,6 28.5,15 35.5,15"/>
+        <g id="compassMarker" class="compass-marker" transform="rotate(0 50 50)">
+          <polygon points="50,9 45,22 55,22"/>
         </g>
-        <!-- GPS-Geschwindigkeit -->
-        <text class="compass-speed-val" id="compassSpeed" x="32" y="34">--</text>
-        <text class="compass-speed-unit" id="compassSpeedUnit" x="32" y="43">km/h</text>
       </svg>
+      <!-- GPS-Geschwindigkeit, gleiche Zifferngröße wie die Uhr -->
+      <div class="compass-speed">
+        <span class="compass-speed-val" id="compassSpeed">--</span>
+        <span class="compass-speed-unit">km/h</span>
+      </div>
     </div>
     <div class="clock-main">
       <div class="clock-time" id="clockTime">--:--:--</div>
@@ -639,37 +656,65 @@
   const compassMarker = document.getElementById('compassMarker');
   const compassSpeedEl = document.getElementById('compassSpeed');
 
+  let compassListening = false;   // verhindert doppelte Event-Listener
+  let compassActive = false;      // true, sobald echte Kompassdaten ankommen
+  let compassAskedOnce = false;   // verhindert mehrfaches Anfragen durch globalen Tap
+
   function setHeading(deg){
     if (typeof deg !== 'number' || isNaN(deg)) return;
     const heading = ((deg % 360) + 360) % 360;
     // Kompasskreis bleibt fix nach Norden ausgerichtet, nur das Symbol dreht sich
-    compassMarker.setAttribute('transform', `rotate(${heading.toFixed(1)} 32 32)`);
+    compassMarker.setAttribute('transform', `rotate(${heading.toFixed(1)} 50 50)`);
+    if (!compassActive) {
+      compassActive = true;
+      compassWrap.classList.remove('needs-permission');
+      compassWrap.title = 'Kompass aktiv';
+    }
   }
 
   function handleOrientation(e){
     let heading = null;
-    if (typeof e.webkitCompassHeading === 'number') {
-      // iOS: bereits im Uhrzeigersinn ab Norden
+    if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
+      // iOS Safari: liefert die Peilung direkt im Uhrzeigersinn ab Norden (genauester Wert)
       heading = e.webkitCompassHeading;
     } else if (e.alpha !== null && e.alpha !== undefined) {
-      // Android: alpha ist gegen den Uhrzeigersinn ab Norden -> umrechnen
+      // Android: alpha zählt gegen den Uhrzeigersinn ab Norden -> umrechnen
       heading = 360 - e.alpha;
     }
     setHeading(heading);
   }
 
   function startOrientationListening(){
+    if (compassListening) return;
+    compassListening = true;
+    // iOS kennt nur 'deviceorientation' (mit webkitCompassHeading), das genauer ist als 'absolute'
     const evName = ('ondeviceorientationabsolute' in window) ? 'deviceorientationabsolute' : 'deviceorientation';
     window.addEventListener(evName, handleOrientation, true);
   }
 
+  function isIOSPermissionAPI(){
+    return typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
+  }
+
   function requestCompassPermission(){
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    if (!window.isSecureContext) {
+      compassWrap.title = 'Kompass benötigt eine HTTPS-Verbindung';
+      return;
+    }
+    if (isIOSPermissionAPI()) {
       DeviceOrientationEvent.requestPermission().then(state => {
-        if (state === 'granted') startOrientationListening();
-      }).catch(() => {});
+        if (state === 'granted') {
+          startOrientationListening();
+        } else {
+          compassWrap.title = 'Kompass-Zugriff verweigert – aktivierbar unter Einstellungen ▸ Safari ▸ Bewegung und Ausrichtung';
+        }
+      }).catch(() => {
+        compassWrap.title = 'Kompass konnte nicht aktiviert werden';
+      });
     } else if ('DeviceOrientationEvent' in window) {
       startOrientationListening();
+    } else {
+      compassWrap.title = 'Kompass wird von diesem Gerät nicht unterstützt';
     }
   }
 
@@ -691,14 +736,31 @@
   }
 
   function initCompassAndSpeed(){
-    // iOS 13+ verlangt eine Nutzergeste, bevor Sensordaten freigegeben werden
-    const needsGesture = typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
-    if (needsGesture) {
-      compassWrap.addEventListener('click', function onTap(){
+    if (isIOSPermissionAPI()) {
+      // iOS 13+ verlangt zwingend eine Nutzergeste, BEVOR der Kompass Daten liefert.
+      compassWrap.classList.add('needs-permission');
+      compassWrap.title = 'Zum Aktivieren des Kompass antippen';
+
+      // Direkter Tap auf das Symbol fragt (erneut) nach der Berechtigung.
+      compassWrap.addEventListener('click', requestCompassPermission);
+
+      // Zusätzlich: die allererste Berührung irgendwo auf der Seite nutzt die
+      // nötige Nutzergeste automatisch, damit der Kompass startet, auch wenn
+      // man nicht gezielt auf das kleine Symbol tippt.
+      const autoRequestOnce = () => {
+        document.removeEventListener('touchend', autoRequestOnce, true);
+        document.removeEventListener('click', autoRequestOnce, true);
+        if (compassAskedOnce) return;
+        compassAskedOnce = true;
         requestCompassPermission();
-      });
-    } else {
+      };
+      document.addEventListener('touchend', autoRequestOnce, true);
+      document.addEventListener('click', autoRequestOnce, true);
+    } else if ('DeviceOrientationEvent' in window) {
+      // Android & ältere iOS-Versionen: kein Permission-Prompt nötig
       startOrientationListening();
+    } else {
+      compassWrap.title = 'Kompass wird von diesem Gerät nicht unterstützt';
     }
     requestSpeedPermission();
   }
