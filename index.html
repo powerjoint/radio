@@ -137,6 +137,25 @@
     animation:compassPulse 1.6s ease-in-out infinite;
   }
   @keyframes compassPulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+  .compass-hint{
+    width:100%;
+    text-align:center;
+    font-size:10.5px;
+    letter-spacing:.03em;
+    color:var(--btc-orange);
+    background:rgba(247,147,26,.08);
+    border-bottom:1px solid var(--btc-orange-dim);
+    padding:7px 14px;
+    transition:opacity .25s, max-height .25s, padding .25s;
+    overflow:hidden;
+  }
+  .compass-hint.hidden{
+    opacity:0;
+    max-height:0;
+    padding:0 14px;
+    border-bottom-width:0;
+  }
   .compass-speed{
     position:absolute;
     inset:0;
@@ -435,6 +454,8 @@
   </div>
 </div>
 
+<div class="compass-hint hidden" id="compassHint">Für Kompass bitte auf das Symbol oben links tippen</div>
+
 <div class="weather-bar">
   <div class="bike-icon" title="Radtour-Wetter">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -655,10 +676,20 @@
   const compassWrap = document.getElementById('compassWrap');
   const compassMarker = document.getElementById('compassMarker');
   const compassSpeedEl = document.getElementById('compassSpeed');
+  const compassHint = document.getElementById('compassHint');
 
-  let compassListening = false;   // verhindert doppelte Event-Listener
-  let compassActive = false;      // true, sobald echte Kompassdaten ankommen
-  let compassAskedOnce = false;   // verhindert mehrfaches Anfragen durch globalen Tap
+  let compassListening = false;    // verhindert doppelte Event-Listener
+  let compassActive = false;       // true, sobald echte Kompassdaten ankommen
+  let compassRequestPending = false; // verhindert PARALLELE Berechtigungsanfragen (Kernfehler zuvor)
+
+  function showCompassHint(text){
+    if (!compassHint) return;
+    compassHint.textContent = text;
+    compassHint.classList.remove('hidden');
+  }
+  function hideCompassHint(){
+    if (compassHint) compassHint.classList.add('hidden');
+  }
 
   function setHeading(deg){
     if (typeof deg !== 'number' || isNaN(deg)) return;
@@ -669,6 +700,7 @@
       compassActive = true;
       compassWrap.classList.remove('needs-permission');
       compassWrap.title = 'Kompass aktiv';
+      hideCompassHint();
     }
   }
 
@@ -687,34 +719,47 @@
   function startOrientationListening(){
     if (compassListening) return;
     compassListening = true;
-    // iOS kennt nur 'deviceorientation' (mit webkitCompassHeading), das genauer ist als 'absolute'
+    // iOS kennt nur 'deviceorientation' (mit webkitCompassHeading); das ist dort genauer als 'absolute'
     const evName = ('ondeviceorientationabsolute' in window) ? 'deviceorientationabsolute' : 'deviceorientation';
     window.addEventListener(evName, handleOrientation, true);
+    // Falls nach kurzer Zeit trotz erteilter Berechtigung keine Daten ankommen
+    // (z.B. Kompass unkalibriert), kurzer Hinweis statt stiller Funkstille.
+    setTimeout(() => {
+      if (!compassActive) showCompassHint('Kompass wartet auf Daten – Handy kurz in einer 8 bewegen');
+    }, 4000);
   }
 
   function isIOSPermissionAPI(){
     return typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function';
   }
 
+  // Zentrale, EINZIGE Stelle, die die Berechtigung anfragt. Der Guard
+  // "compassRequestPending" verhindert, dass zwei Listener (Tap auf das
+  // Symbol + globaler erster Tap) gleichzeitig requestPermission() aufrufen –
+  // genau das hat die Freigabe zuvor unzuverlässig gemacht.
   function requestCompassPermission(){
+    if (compassActive || compassRequestPending) return;
     if (!window.isSecureContext) {
-      compassWrap.title = 'Kompass benötigt eine HTTPS-Verbindung';
+      showCompassHint('Kompass benötigt eine HTTPS-Verbindung');
       return;
     }
     if (isIOSPermissionAPI()) {
+      compassRequestPending = true;
       DeviceOrientationEvent.requestPermission().then(state => {
+        compassRequestPending = false;
         if (state === 'granted') {
           startOrientationListening();
         } else {
-          compassWrap.title = 'Kompass-Zugriff verweigert – aktivierbar unter Einstellungen ▸ Safari ▸ Bewegung und Ausrichtung';
+          showCompassHint('Kompass-Zugriff verweigert – aktivierbar unter Einstellungen ▸ Safari ▸ Bewegung und Ausrichtung');
         }
       }).catch(() => {
-        compassWrap.title = 'Kompass konnte nicht aktiviert werden';
+        compassRequestPending = false;
+        showCompassHint('Kompass konnte nicht aktiviert werden – bitte erneut tippen');
       });
     } else if ('DeviceOrientationEvent' in window) {
       startOrientationListening();
     } else {
-      compassWrap.title = 'Kompass wird von diesem Gerät nicht unterstützt';
+      showCompassHint('Kompass wird von diesem Gerät/Browser nicht unterstützt');
     }
   }
 
@@ -725,7 +770,7 @@
         const speedMs = pos.coords.speed;
         if (typeof speedMs === 'number' && speedMs >= 0 && !isNaN(speedMs)) {
           const kmh = speedMs * 3.6;
-          compassSpeedEl.textContent = kmh < 10 ? kmh.toFixed(1) : Math.round(kmh).toString();
+          compassSpeedEl.textContent = Math.round(kmh).toString();
         } else {
           compassSpeedEl.textContent = '0';
         }
@@ -741,21 +786,29 @@
       compassWrap.classList.add('needs-permission');
       compassWrap.title = 'Zum Aktivieren des Kompass antippen';
 
-      // Direkter Tap auf das Symbol fragt (erneut) nach der Berechtigung.
-      compassWrap.addEventListener('click', requestCompassPermission);
+      let hint = 'Für Kompass bitte auf das Symbol oben links tippen';
+      if (window.navigator.standalone === true) {
+        // Bekannte iOS-Einschränkung: als Homescreen-App funktioniert die
+        // Sensor-Freigabe auf manchen iOS-Versionen unzuverlässig.
+        hint += ' (funktioniert die Abfrage nicht, App einmal direkt in Safari öffnen)';
+      }
+      showCompassHint(hint);
 
-      // Zusätzlich: die allererste Berührung irgendwo auf der Seite nutzt die
-      // nötige Nutzergeste automatisch, damit der Kompass startet, auch wenn
-      // man nicht gezielt auf das kleine Symbol tippt.
-      const autoRequestOnce = () => {
-        document.removeEventListener('touchend', autoRequestOnce, true);
-        document.removeEventListener('click', autoRequestOnce, true);
-        if (compassAskedOnce) return;
-        compassAskedOnce = true;
+      // Ein einziger Tap – egal ob direkt auf das Symbol oder irgendwo sonst
+      // auf der Seite – reicht als Nutzergeste und löst GENAU EINE Anfrage aus.
+      let compassGestureUsed = false;
+      const onFirstGesture = (ev) => {
+        if (compassGestureUsed || compassActive) return;
+        compassGestureUsed = true;
+        document.removeEventListener('pointerup', onFirstGesture, true);
         requestCompassPermission();
       };
-      document.addEventListener('touchend', autoRequestOnce, true);
-      document.addEventListener('click', autoRequestOnce, true);
+      document.addEventListener('pointerup', onFirstGesture, true);
+
+      // Erneuter Tap direkt auf das Symbol (z.B. nach einer Verweigerung,
+      // wenn der Nutzer die Einstellung geändert hat) darf jederzeit erneut
+      // versuchen – geschützt durch denselben "compassRequestPending"-Guard.
+      compassWrap.addEventListener('click', requestCompassPermission);
     } else if ('DeviceOrientationEvent' in window) {
       // Android & ältere iOS-Versionen: kein Permission-Prompt nötig
       startOrientationListening();
