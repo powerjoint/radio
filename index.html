@@ -547,7 +547,7 @@
         <div class="label">Läuft</div>
         <div class="title muted" id="nowPlaying">Kein Sender gewählt</div>
       </div>
-      <button class="play-btn" id="playBtn" aria-label="Play/Pause" disabled>
+      <button class="play-btn" id="playBtn" aria-label="Play/Pause">
         <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
       </button>
@@ -685,20 +685,26 @@
     navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
   }
 
-  function playStationByKey(key){
+  function playStationByKey(key, opts = {}){
     const station = stationByKey(key);
     if (!station) return;
+    const autoplay = opts.autoplay !== false;
+
     currentStation = key;
     audio.src = station.url;
     audio.load();
-    statusText.textContent = 'Verbinde…';
     updateNowPlaying();
-    playBtn.disabled = false;
 
-    audio.play().then(() => {
-      updateStatus();
+    if (autoplay) {
+      statusText.textContent = 'Verbinde…';
+      audio.play().then(() => {
+        updateStatus();
+        updateMediaSession();
+      }).catch(() => { statusText.textContent = 'Fehler'; });
+    } else {
+      statusText.textContent = 'Bereit';
       updateMediaSession();
-    }).catch(() => { statusText.textContent = 'Fehler'; });
+    }
   }
 
   function togglePlay(){
@@ -782,8 +788,9 @@
     navigator.mediaSession.setActionHandler('pause', () => audio.pause());
   }
 
-  updateStatus();
-  updateNowPlaying();
+  // Beim Start ist bereits "Joe Nederland" ausgewählt (Sender geladen, aber
+  // noch nicht gestartet) – der Play-Button funktioniert dadurch sofort.
+  playStationByKey('joe', { autoplay: false });
 
   /* ============ CLOCK ============ */
   const clockTime = document.getElementById('clockTime');
