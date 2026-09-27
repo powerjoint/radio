@@ -297,37 +297,77 @@
   }
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 
-  .station{
-    width:100%;
-    display:block;
-    text-align:left;
-    background:#0f0f0d;
+  /* ===== TUNER-WALZE (einziges Steuerelement zur Sender-Auswahl) ===== */
+  .tuner{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .tuner-arrow{
+    flex-shrink:0;
+    width:34px;height:34px;
+    border-radius:50%;
     border:1px solid #232320;
-    border-radius:12px;
-    padding:16px 18px;
-    margin-bottom:12px;
+    background:#0f0f0d;
+    color:var(--dim);
+    display:flex;align-items:center;justify-content:center;
     cursor:pointer;
-    color:var(--off-white);
-    font-family:inherit;
-    position:relative;
-    overflow:hidden;
-    transition:border-color .2s, background .2s;
+    transition:border-color .2s, color .2s, transform .1s;
   }
-  .station:last-of-type{margin-bottom:0;}
-  .station:active{transform:scale(.99);}
-  .station .row{display:flex;align-items:center;justify-content:space-between;}
-  .station .label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#75756f;margin-bottom:4px;}
-  .station .title{font-size:19px;font-weight:700;letter-spacing:.02em;}
-  .station .freq{font-size:12px;color:var(--btc-orange-dim);letter-spacing:.05em;white-space:nowrap;}
-  .station.active{
-    border-color:var(--btc-orange);
-    background:linear-gradient(90deg, rgba(247,147,26,.12), transparent);
-  }
-  .station.active .freq{color:var(--btc-orange);}
-  .needle{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--btc-orange);opacity:0;transition:opacity .2s;}
-  .station.active .needle{opacity:1;}
+  .tuner-arrow:active{transform:scale(.9);}
+  .tuner-arrow:hover{color:var(--btc-orange);border-color:var(--btc-orange-dim);}
+  .tuner-arrow svg{width:16px;height:16px;}
 
-  .controls{margin-top:24px;display:flex;align-items:center;justify-content:center;gap:18px;}
+  .tuner-window{
+    position:relative;
+    flex:1;
+    height:132px; /* 3 × Zeilenhöhe (44px) */
+    overflow:hidden;
+    touch-action:pan-y;
+    cursor:grab;
+    -webkit-mask-image:linear-gradient(180deg, transparent 0%, #000 26%, #000 74%, transparent 100%);
+    mask-image:linear-gradient(180deg, transparent 0%, #000 26%, #000 74%, transparent 100%);
+  }
+  .tuner-window:active{cursor:grabbing;}
+  .tuner-track{
+    position:absolute;
+    left:0;right:0;top:0;
+    will-change:transform;
+  }
+  .tuner-item{
+    height:44px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:0 6px;
+    opacity:.32;
+    transform:scale(.84);
+    transition:opacity .2s, transform .2s;
+  }
+  .tuner-item-label{font-size:8.5px;letter-spacing:.15em;text-transform:uppercase;color:#75756f;}
+  .tuner-item-title{font-size:17px;font-weight:700;letter-spacing:.02em;color:var(--off-white);white-space:nowrap;}
+  .tuner-item-freq{font-size:9.5px;color:var(--btc-orange-dim);letter-spacing:.05em;white-space:nowrap;}
+  .tuner-item.is-active{
+    opacity:1;
+    transform:scale(1);
+  }
+  .tuner-item.is-active .tuner-item-freq{color:var(--btc-orange);}
+
+  .tuner-highlight{
+    position:absolute;
+    left:0;right:0;
+    top:50%;
+    height:44px;
+    transform:translateY(-50%);
+    border-top:1px solid var(--btc-orange-dim);
+    border-bottom:1px solid var(--btc-orange-dim);
+    background:linear-gradient(90deg, rgba(247,147,26,.07), transparent 65%);
+    pointer-events:none;
+  }
+
+  .controls{margin-top:22px;display:flex;align-items:center;justify-content:center;gap:18px;}
   .now-playing{flex:1;min-width:0;}
   .now-playing .label{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:#75756f;}
   .now-playing .title{font-size:15px;font-weight:700;color:var(--off-white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -412,7 +452,7 @@
 
   @media (max-width:380px){
     .set{padding:20px 16px 22px;}
-    .station .title{font-size:17px;}
+    .tuner-item-title{font-size:15.5px;}
     .btc-card{padding:14px 16px 4px;}
     .btc-price{font-size:20px;}
     .rain-countdown{font-size:16px;}
@@ -487,27 +527,20 @@
       <span class="status"><span class="dot" id="liveDot"></span><span id="statusText">Bereit</span></span>
     </div>
 
-    <button class="station" id="btnJoe" data-station="joe">
-      <div class="needle"></div>
-      <div class="row">
-        <div>
-          <div class="label">Niederlande</div>
-          <div class="title">Joe Nederland</div>
-        </div>
-        <div class="freq">HITS 70•80•90</div>
-      </div>
-    </button>
+    <div class="tuner" id="tuner">
+      <button class="tuner-arrow" id="tunerPrev" aria-label="Vorheriger Sender">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+      </button>
 
-    <button class="station" id="btnSwr3" data-station="swr3">
-      <div class="needle"></div>
-      <div class="row">
-        <div>
-          <div class="label">Deutschland</div>
-          <div class="title">SWR3</div>
-        </div>
-        <div class="freq">MEHR HITS</div>
+      <div class="tuner-window" id="tunerWindow" tabindex="0" role="listbox" aria-label="Sender wählen">
+        <div class="tuner-track" id="tunerTrack"></div>
+        <div class="tuner-highlight"></div>
       </div>
-    </button>
+
+      <button class="tuner-arrow" id="tunerNext" aria-label="Nächster Sender">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
 
     <div class="controls">
       <div class="now-playing">
@@ -555,10 +588,13 @@
 
 <script>
   /* ============ RADIO ============ */
-  const STATIONS = {
-    joe:  { name: "Joe Nederland", url: "https://stream.joe.nl/joe/mp3" },
-    swr3: { name: "SWR3",          url: "https://liveradio.swr.de/sw282p3/swr3/play.mp3" }
-  };
+  const STATIONS = [
+    { key: 'joe',    label: 'Niederlande', title: 'Joe Nederland',      freq: 'HITS 70•80•90',      url: 'https://stream.joe.nl/joe/mp3' },
+    { key: 'swr3',   label: 'Deutschland', title: 'SWR3',               freq: 'MEHR HITS',          url: 'https://liveradio.swr.de/sw282p3/swr3/play.mp3' },
+    { key: 'reggae', label: 'SomaFM',      title: 'Heavyweight Reggae', freq: 'REGGAE • DUB • SKA', url: 'https://ice.somafm.com/reggae' }
+  ];
+  const N = STATIONS.length;
+  const stationByKey = key => STATIONS.find(s => s.key === key);
 
   const audio = document.getElementById('audio');
   const playBtn = document.getElementById('playBtn');
@@ -567,16 +603,52 @@
   const nowPlaying = document.getElementById('nowPlaying');
   const statusText = document.getElementById('statusText');
   const liveDot = document.getElementById('liveDot');
-  const btnJoe = document.getElementById('btnJoe');
-  const btnSwr3 = document.getElementById('btnSwr3');
-  const stationButtons = { joe: btnJoe, swr3: btnSwr3 };
+
+  const tunerWindow = document.getElementById('tunerWindow');
+  const tunerTrack = document.getElementById('tunerTrack');
+  const tunerPrev = document.getElementById('tunerPrev');
+  const tunerNext = document.getElementById('tunerNext');
+
+  const ITEM_H = 44;   // muss mit .tuner-item { height } übereinstimmen
+  const COPIES = 3;    // 3 Kopien der Senderliste -> nahtlos endlos drehbare Walze
 
   let currentStation = null;
+  let tunerPos = N;    // Index in der (COPIES × N) langen Liste; startet in der mittleren Kopie bei Sender 0
   audio.setAttribute('playsinline', '');
 
-  function setActiveButton(key){
-    Object.entries(stationButtons).forEach(([k, el]) => el.classList.toggle('active', k === key));
+  // ---- Walze aufbauen (3 Kopien der Senderliste hintereinander) ----
+  function buildTunerItems(){
+    tunerTrack.innerHTML = '';
+    for (let c = 0; c < COPIES; c++) {
+      STATIONS.forEach(st => {
+        const el = document.createElement('div');
+        el.className = 'tuner-item';
+        el.dataset.key = st.key;
+        el.innerHTML =
+          `<div class="tuner-item-label">${st.label}</div>` +
+          `<div class="tuner-item-title">${st.title}</div>` +
+          `<div class="tuner-item-freq">${st.freq}</div>`;
+        tunerTrack.appendChild(el);
+      });
+    }
   }
+  buildTunerItems();
+
+  function stationIndexFromPos(pos){ return ((pos % N) + N) % N; }
+
+  function renderTuner(withTransition){
+    tunerTrack.style.transition = withTransition ? 'transform .32s cubic-bezier(.22,.9,.3,1)' : 'none';
+    tunerTrack.style.transform = `translateY(${-(tunerPos - 1) * ITEM_H}px)`;
+    Array.from(tunerTrack.children).forEach((el, i) => el.classList.toggle('is-active', i === tunerPos));
+  }
+  renderTuner(false);
+
+  // Nach jeder Drehung unsichtbar in die mittlere Kopie zurückspringen,
+  // damit die Walze endlos in beide Richtungen weiterdrehen kann.
+  tunerTrack.addEventListener('transitionend', () => {
+    if (tunerPos >= 2 * N) { tunerPos -= N; renderTuner(false); }
+    else if (tunerPos < N) { tunerPos += N; renderTuner(false); }
+  });
 
   function updateStatus(){
     if (audio.paused) {
@@ -596,7 +668,7 @@
 
   function updateNowPlaying(){
     if (currentStation) {
-      nowPlaying.textContent = STATIONS[currentStation].name;
+      nowPlaying.textContent = stationByKey(currentStation).title;
       nowPlaying.classList.remove('muted');
     } else {
       nowPlaying.textContent = 'Kein Sender gewählt';
@@ -607,22 +679,19 @@
   function updateMediaSession(){
     if (!('mediaSession' in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: currentStation ? STATIONS[currentStation].name : 'Radio',
+      title: currentStation ? stationByKey(currentStation).title : 'Radio',
       artist: 'Livestream',
     });
     navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
   }
 
-  function playStation(key){
-    const station = STATIONS[key];
+  function playStationByKey(key){
+    const station = stationByKey(key);
     if (!station) return;
-    if (currentStation === key) { togglePlay(); return; }
-
     currentStation = key;
     audio.src = station.url;
     audio.load();
     statusText.textContent = 'Verbinde…';
-    setActiveButton(key);
     updateNowPlaying();
     playBtn.disabled = false;
 
@@ -641,8 +710,65 @@
     }
   }
 
-  btnJoe.addEventListener('click', () => playStation('joe'));
-  btnSwr3.addEventListener('click', () => playStation('swr3'));
+  // Zentraler Auswahl-Handler der Walze: gleicher Sender = Play/Pause,
+  // anderer Sender = wechseln + sofort starten (wie ein echtes Senderrad).
+  function selectTunerStation(pos){
+    tunerPos = pos;
+    renderTuner(true);
+    const key = STATIONS[stationIndexFromPos(tunerPos)].key;
+    if (currentStation === key) togglePlay();
+    else playStationByKey(key);
+  }
+
+  tunerPrev.addEventListener('click', () => selectTunerStation(tunerPos - 1));
+  tunerNext.addEventListener('click', () => selectTunerStation(tunerPos + 1));
+
+  // Tastatur-Bedienung (Pfeiltasten), wenn die Walze fokussiert ist
+  tunerWindow.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp')   { e.preventDefault(); selectTunerStation(tunerPos - 1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); selectTunerStation(tunerPos + 1); }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectTunerStation(tunerPos); }
+  });
+
+  // Drehen per Ziehen/Wischen (Maus & Touch über Pointer Events)
+  let dragging = false, dragStartY = 0, dragBaseY = 0;
+
+  tunerWindow.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    dragStartY = e.clientY;
+    dragBaseY = -(tunerPos - 1) * ITEM_H;
+    tunerTrack.style.transition = 'none';
+    tunerWindow.setPointerCapture(e.pointerId);
+  });
+
+  tunerWindow.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    tunerTrack.style.transform = `translateY(${dragBaseY + (e.clientY - dragStartY)}px)`;
+  });
+
+  function endDrag(e){
+    if (!dragging) return;
+    dragging = false;
+    const delta = e.clientY - dragStartY;
+
+    if (Math.abs(delta) < 6) {
+      // Als Tap gewertet: direkt angetippten Eintrag (Mitte oder Vorschau) auswählen
+      const itemEl = e.target.closest ? e.target.closest('.tuner-item') : null;
+      const idx = itemEl ? Array.from(tunerTrack.children).indexOf(itemEl) : tunerPos;
+      selectTunerStation(idx);
+    } else {
+      selectTunerStation(tunerPos - Math.round(delta / ITEM_H));
+    }
+  }
+  tunerWindow.addEventListener('pointerup', endDrag);
+  tunerWindow.addEventListener('pointercancel', () => { dragging = false; renderTuner(true); });
+
+  // Mausrad über der Walze dreht ebenfalls weiter
+  tunerWindow.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    selectTunerStation(tunerPos + (e.deltaY > 0 ? 1 : -1));
+  }, { passive: false });
+
   playBtn.addEventListener('click', togglePlay);
 
   audio.addEventListener('play', () => { updateStatus(); updateMediaSession(); });
