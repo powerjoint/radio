@@ -589,9 +589,19 @@
 <script>
   /* ============ RADIO ============ */
   const STATIONS = [
-    { key: 'joe',    label: 'Niederlande', title: 'Joe Nederland',      freq: 'HITS 70•80•90',      url: 'https://stream.joe.nl/joe/mp3' },
-    { key: 'swr3',   label: 'Deutschland', title: 'SWR3',               freq: 'MEHR HITS',          url: 'https://liveradio.swr.de/sw282p3/swr3/play.mp3' },
-    { key: 'reggae', label: 'SomaFM',      title: 'Heavyweight Reggae', freq: 'REGGAE • DUB • SKA', url: 'https://ice.somafm.com/reggae' }
+    { key: 'joe',    label: 'Niederlande', title: 'Joe Nederland',      freq: 'HITS 70•80•90',
+      urls: ['https://stream.joe.nl/joe/mp3'] },
+    { key: 'swr3',   label: 'Deutschland', title: 'SWR3',               freq: 'MEHR HITS',
+      urls: ['https://liveradio.swr.de/sw282p3/swr3/play.mp3'] },
+    { key: 'reggae', label: 'SomaFM',      title: 'Heavyweight Reggae', freq: 'REGGAE • DUB • SKA',
+      // Mehrere SomaFM-Spiegelserver als Fallback, falls einzelne Server nicht erreichbar sind
+      urls: [
+        'https://ice6.somafm.com/reggae-128-mp3',
+        'https://ice2.somafm.com/reggae-128-mp3',
+        'https://ice1.somafm.com/reggae-128-mp3',
+        'https://ice4.somafm.com/reggae-128-mp3',
+        'https://ice6.somafm.com/reggae-256-mp3'
+      ] }
   ];
   const N = STATIONS.length;
   const stationByKey = key => STATIONS.find(s => s.key === key);
@@ -685,32 +695,56 @@
     navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
   }
 
+  let currentUrlIndex = 0;
+  let lastAutoplayIntent = true;
+
   function playStationByKey(key, opts = {}){
     const station = stationByKey(key);
     if (!station) return;
-    const autoplay = opts.autoplay !== false;
-
+    lastAutoplayIntent = opts.autoplay !== false;
     currentStation = key;
-    audio.src = station.url;
+    currentUrlIndex = 0;
+    loadCurrentUrl();
+  }
+
+  function loadCurrentUrl(){
+    const station = stationByKey(currentStation);
+    if (!station) return;
+    audio.src = station.urls[currentUrlIndex];
     audio.load();
     updateNowPlaying();
 
-    if (autoplay) {
-      statusText.textContent = 'Verbinde…';
+    if (lastAutoplayIntent) {
+      statusText.textContent = currentUrlIndex === 0 ? 'Verbinde…' : 'Verbinde… (Ausweichserver)';
       audio.play().then(() => {
         updateStatus();
         updateMediaSession();
-      }).catch(() => { statusText.textContent = 'Fehler'; });
+      }).catch(() => tryNextUrlOrFail());
     } else {
       statusText.textContent = 'Bereit';
       updateMediaSession();
     }
   }
 
+  // Springt automatisch zum nächsten SomaFM-Spiegelserver, falls einer nicht
+  // erreichbar ist – erst wenn wirklich alle Server fehlschlagen, "Fehler".
+  function tryNextUrlOrFail(){
+    const station = stationByKey(currentStation);
+    if (!station) return;
+    if (currentUrlIndex < station.urls.length - 1) {
+      currentUrlIndex++;
+      loadCurrentUrl();
+    } else {
+      statusText.textContent = 'Fehler';
+      liveDot.classList.remove('live');
+    }
+  }
+
   function togglePlay(){
     if (!currentStation) return;
     if (audio.paused) {
-      audio.play().catch(() => { statusText.textContent = 'Fehler'; });
+      lastAutoplayIntent = true;
+      audio.play().catch(() => tryNextUrlOrFail());
     } else {
       audio.pause();
     }
@@ -781,7 +815,7 @@
   audio.addEventListener('pause', () => { updateStatus(); updateMediaSession(); });
   audio.addEventListener('waiting', () => { statusText.textContent = 'Puffert…'; });
   audio.addEventListener('playing', () => { updateStatus(); });
-  audio.addEventListener('error', () => { statusText.textContent = 'Fehler'; liveDot.classList.remove('live'); });
+  audio.addEventListener('error', () => { tryNextUrlOrFail(); });
 
   if ('mediaSession' in navigator) {
     navigator.mediaSession.setActionHandler('play', () => audio.play().catch(()=>{}));
