@@ -594,13 +594,15 @@
     { key: 'swr3',   label: 'Deutschland', title: 'SWR3',               freq: 'MEHR HITS',
       urls: ['https://liveradio.swr.de/sw282p3/swr3/play.mp3'] },
     { key: 'reggae', label: 'SomaFM',      title: 'Heavyweight Reggae', freq: 'REGGAE • DUB • SKA',
-      // Mehrere SomaFM-Spiegelserver als Fallback, falls einzelne Server nicht erreichbar sind
+      // Bestätigt funktionierende SomaFM-Spiegelserver zuerst; der 128-mount
+      // scheint für diesen Kanal nicht zu existieren (Verbindung bleibt offen,
+      // liefert aber keine Daten -> endloses "Puffern" ohne Fehler-Event).
       urls: [
-        'https://ice6.somafm.com/reggae-128-mp3',
-        'https://ice2.somafm.com/reggae-128-mp3',
-        'https://ice1.somafm.com/reggae-128-mp3',
-        'https://ice4.somafm.com/reggae-128-mp3',
-        'https://ice6.somafm.com/reggae-256-mp3'
+        'https://ice6.somafm.com/reggae-256-mp3',
+        'https://ice2.somafm.com/reggae-256-mp3',
+        'https://ice1.somafm.com/reggae-256-mp3',
+        'https://ice4.somafm.com/reggae-256-mp3',
+        'https://ice5.somafm.com/reggae-256-mp3'
       ] }
   ];
   const N = STATIONS.length;
@@ -698,6 +700,18 @@
   let currentUrlIndex = 0;
   let lastAutoplayIntent = true;
 
+  const STALL_TIMEOUT_MS = 9000;
+  let stallTimer = null;
+  function clearStallTimer(){ if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; } }
+  function armStallTimer(){
+    clearStallTimer();
+    // "play()" kann erfolgreich auflösen, obwohl der Server die Verbindung nur
+    // offen hält, ohne je echte Audiodaten zu senden (endloses Puffern ohne
+    // Fehler-Event). Kommt bis dahin kein "playing"/"timeupdate", gilt der
+    // Server als tot -> nächster Spiegelserver.
+    stallTimer = setTimeout(() => { tryNextUrlOrFail(); }, STALL_TIMEOUT_MS);
+  }
+
   function playStationByKey(key, opts = {}){
     const station = stationByKey(key);
     if (!station) return;
@@ -710,12 +724,14 @@
   function loadCurrentUrl(){
     const station = stationByKey(currentStation);
     if (!station) return;
+    clearStallTimer();
     audio.src = station.urls[currentUrlIndex];
     audio.load();
     updateNowPlaying();
 
     if (lastAutoplayIntent) {
       statusText.textContent = currentUrlIndex === 0 ? 'Verbinde…' : 'Verbinde… (Ausweichserver)';
+      armStallTimer();
       audio.play().then(() => {
         updateStatus();
         updateMediaSession();
@@ -727,8 +743,10 @@
   }
 
   // Springt automatisch zum nächsten SomaFM-Spiegelserver, falls einer nicht
-  // erreichbar ist – erst wenn wirklich alle Server fehlschlagen, "Fehler".
+  // erreichbar ist oder verhängt – erst wenn wirklich alle Server
+  // fehlschlagen, "Fehler".
   function tryNextUrlOrFail(){
+    clearStallTimer();
     const station = stationByKey(currentStation);
     if (!station) return;
     if (currentUrlIndex < station.urls.length - 1) {
@@ -744,8 +762,10 @@
     if (!currentStation) return;
     if (audio.paused) {
       lastAutoplayIntent = true;
+      armStallTimer();
       audio.play().catch(() => tryNextUrlOrFail());
     } else {
+      clearStallTimer();
       audio.pause();
     }
   }
@@ -812,9 +832,10 @@
   playBtn.addEventListener('click', togglePlay);
 
   audio.addEventListener('play', () => { updateStatus(); updateMediaSession(); });
-  audio.addEventListener('pause', () => { updateStatus(); updateMediaSession(); });
+  audio.addEventListener('pause', () => { clearStallTimer(); updateStatus(); updateMediaSession(); });
   audio.addEventListener('waiting', () => { statusText.textContent = 'Puffert…'; });
-  audio.addEventListener('playing', () => { updateStatus(); });
+  audio.addEventListener('playing', () => { clearStallTimer(); updateStatus(); });
+  audio.addEventListener('timeupdate', () => { clearStallTimer(); });
   audio.addEventListener('error', () => { tryNextUrlOrFail(); });
 
   if ('mediaSession' in navigator) {
