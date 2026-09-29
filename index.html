@@ -593,15 +593,18 @@
     { key: 'swr3',   label: 'Deutschland', title: 'SWR3',               freq: 'MEHR HITS',
       urls: ['https://liveradio.swr.de/sw282p3/swr3/play.mp3'] },
     { key: 'reggae', label: 'SomaFM',      title: 'Heavyweight Reggae', freq: 'REGGAE • DUB • SKA',
-      // Offizielle "Direct Server"-Links laut somafm.com/reggae/directstreamlinks.html
-      // (dieser Kanal liegt nur auf ice5 und ice3)
+      // Frisch von somafm.com/reggae/directstreamlinks.html abgerufen (Stand: heute).
+      // Vorheriger Fehler: "ice3" als Alt-Server existiert für diesen Kanal gar nicht,
+      // korrekt sind laut offizieller Seite nur die Server ice5 (Haupt) und ice2 (Alt).
       urls: [
         'https://ice5.somafm.com/reggae-128-mp3',
-        'https://ice3.somafm.com/reggae-128-mp3',
+        'https://ice2.somafm.com/reggae-128-mp3',
         'https://ice5.somafm.com/reggae-256-mp3',
-        'https://ice3.somafm.com/reggae-256-mp3',
+        'https://ice2.somafm.com/reggae-256-mp3',
         'https://ice5.somafm.com/reggae-128-aac',
-        'https://ice3.somafm.com/reggae-128-aac'
+        'https://ice2.somafm.com/reggae-128-aac',
+        'https://ice5.somafm.com/reggae-80-aac',
+        'https://ice2.somafm.com/reggae-80-aac'
       ] }
   ];
   const N = STATIONS.length;
@@ -699,7 +702,7 @@
   let currentUrlIndex = 0;
   let lastAutoplayIntent = true;
 
-  const STALL_TIMEOUT_MS = 9000;
+  const STALL_TIMEOUT_MS = 6000;
   let stallTimer = null;
   function clearStallTimer(){ if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; } }
   function armStallTimer(){
@@ -1183,6 +1186,7 @@
   async function fetchBtcPrice(){
     try {
       const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur&include_24hr_change=true');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const price = data.bitcoin.eur;
       const change24h = data.bitcoin.eur_24h_change;
@@ -1203,7 +1207,10 @@
     }
   }
   fetchBtcPrice();
-  setInterval(fetchBtcPrice, 10000);
+  // 30s statt 10s: CoinGeckos kostenlose API erlaubt nur ~10–30 Anfragen/Minute
+  // pro IP (geteilt mit allen anderen im selben Netzwerk) – zu häufiges Abfragen
+  // führte zu "429 Too Many Requests" und damit zeitweise zu keinem Kurs.
+  setInterval(fetchBtcPrice, 30000);
 
   /* ============ BITCOIN CHART ============ */
   const chartSvg = document.getElementById('chartSvg');
@@ -1256,6 +1263,7 @@
       const to = Math.floor(Date.now() / 1000);
       const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=eur&from=${CHART_START}&to=${to}`;
       const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       if (data && data.prices && data.prices.length) {
         renderChart(data.prices);
@@ -1265,7 +1273,9 @@
     }
   }
   fetchBtcHistory();
-  setInterval(fetchBtcHistory, 10000);
+  // Der Kursverlauf ändert sich innerhalb weniger Minuten kaum – alle 5 statt
+  // alle 10 Sekunden abzufragen spart Anfragen und schont das gemeinsame Limit.
+  setInterval(fetchBtcHistory, 300000);
 </script>
 </body>
 </html>
