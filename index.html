@@ -283,7 +283,26 @@
     align-items:center;
     gap:6px;
     text-transform:uppercase;
+    cursor:pointer;
+    user-select:none;
+    -webkit-user-select:none;
   }
+  .radio-debug{
+    margin-top:12px;
+    max-height:130px;
+    overflow-y:auto;
+    font-family:'SF Mono', 'Menlo', monospace;
+    font-size:9.5px;
+    line-height:1.5;
+    color:var(--dim);
+    background:#0d0d0b;
+    border:1px solid #232320;
+    border-radius:8px;
+    padding:8px 10px;
+    white-space:pre-wrap;
+    word-break:break-all;
+  }
+  .radio-debug.hidden{display:none;}
   .dot{
     width:6px;height:6px;border-radius:50%;
     background:#4a4a44;
@@ -551,6 +570,8 @@
         <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
       </button>
     </div>
+
+    <pre class="radio-debug hidden" id="radioDebug"></pre>
   </div>
 
   <div class="btc-card">
@@ -622,6 +643,35 @@
   const tunerTrack = document.getElementById('tunerTrack');
   const tunerPrev = document.getElementById('tunerPrev');
   const tunerNext = document.getElementById('tunerNext');
+  const radioDebugEl = document.getElementById('radioDebug');
+
+  // Diagnose-Log: protokolliert jeden Verbindungsversuch mit genauem Ergebnis
+  // (HTTP/Media-Fehlercode, Timeout, Erfolg). Sichtbar durch Doppeltipp/-klick
+  // auf die Statuszeile ("Bereit"/"Live"/...) oben links im Radio-Kasten.
+  const debugLog = [];
+  function logDebug(msg){
+    const t = new Date().toLocaleTimeString('de-DE');
+    debugLog.push(`[${t}] ${msg}`);
+    if (debugLog.length > 40) debugLog.shift();
+    if (!radioDebugEl.classList.contains('hidden')) {
+      radioDebugEl.textContent = debugLog.join('\n');
+      radioDebugEl.scrollTop = radioDebugEl.scrollHeight;
+    }
+  }
+  function toggleDebugPanel(){
+    radioDebugEl.classList.toggle('hidden');
+    if (!radioDebugEl.classList.contains('hidden')) {
+      radioDebugEl.textContent = debugLog.length ? debugLog.join('\n') : '(noch keine Einträge)';
+      radioDebugEl.scrollTop = radioDebugEl.scrollHeight;
+    }
+  }
+  statusText.addEventListener('dblclick', toggleDebugPanel);
+  let statusPressTimer = null;
+  statusText.addEventListener('touchstart', () => {
+    statusPressTimer = setTimeout(toggleDebugPanel, 600);
+  }, { passive: true });
+  statusText.addEventListener('touchend', () => clearTimeout(statusPressTimer));
+  statusText.addEventListener('touchmove', () => clearTimeout(statusPressTimer));
 
   const ITEM_H = 44;   // muss mit .tuner-item { height } übereinstimmen
   const COPIES = 3;    // 3 Kopien der Senderliste -> nahtlos endlos drehbare Walze
@@ -711,7 +761,11 @@
     // offen hält, ohne je echte Audiodaten zu senden (endloses Puffern ohne
     // Fehler-Event). Kommt bis dahin kein "playing"/"timeupdate", gilt der
     // Server als tot -> nächster Spiegelserver.
-    stallTimer = setTimeout(() => { tryNextUrlOrFail(); }, STALL_TIMEOUT_MS);
+    const src = audio.src;
+    stallTimer = setTimeout(() => {
+      logDebug(`Timeout nach ${STALL_TIMEOUT_MS/1000}s ohne Audiodaten: ${src}`);
+      tryNextUrlOrFail();
+    }, STALL_TIMEOUT_MS);
   }
 
   function playStationByKey(key, opts = {}){
@@ -720,6 +774,7 @@
     lastAutoplayIntent = opts.autoplay !== false;
     currentStation = key;
     currentUrlIndex = 0;
+    logDebug(`--- Sender gewählt: ${station.title} ---`);
     loadCurrentUrl();
   }
 
@@ -727,19 +782,26 @@
     const station = stationByKey(currentStation);
     if (!station) return;
     clearStallTimer();
-    audio.src = station.urls[currentUrlIndex];
+    const url = station.urls[currentUrlIndex];
+    audio.src = url;
     audio.load();
     updateNowPlaying();
 
     if (lastAutoplayIntent) {
       statusText.textContent = currentUrlIndex === 0 ? 'Verbinde…' : 'Verbinde… (Ausweichserver)';
+      logDebug(`Verbinde (${currentUrlIndex + 1}/${station.urls.length}): ${url}`);
       armStallTimer();
       audio.play().then(() => {
+        logDebug(`play() erfolgreich: ${url}`);
         updateStatus();
         updateMediaSession();
-      }).catch(() => tryNextUrlOrFail());
+      }).catch((err) => {
+        logDebug(`play() abgelehnt (${err && err.name}: ${err && err.message}): ${url}`);
+        tryNextUrlOrFail();
+      });
     } else {
       statusText.textContent = 'Bereit';
+      logDebug(`Vorgeladen (kein Autoplay): ${url}`);
       updateMediaSession();
     }
   }
@@ -755,6 +817,7 @@
       currentUrlIndex++;
       loadCurrentUrl();
     } else {
+      logDebug('Alle Server fehlgeschlagen -> "Fehler"');
       statusText.textContent = 'Fehler';
       liveDot.classList.remove('live');
     }
@@ -836,9 +899,16 @@
   audio.addEventListener('play', () => { updateStatus(); updateMediaSession(); });
   audio.addEventListener('pause', () => { clearStallTimer(); updateStatus(); updateMediaSession(); });
   audio.addEventListener('waiting', () => { statusText.textContent = 'Puffert…'; });
-  audio.addEventListener('playing', () => { clearStallTimer(); updateStatus(); });
+  audio.addEventListener('playing', () => { logDebug(`"playing"-Event (Audiodaten fließen): ${audio.src}`); clearStallTimer(); updateStatus(); });
   audio.addEventListener('timeupdate', () => { clearStallTimer(); });
-  audio.addEventListener('error', () => { tryNextUrlOrFail(); });
+  audio.addEventListener('error', () => {
+    // MediaError-Codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
+    const codeNames = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
+    const err = audio.error;
+    const codeName = err ? (codeNames[err.code] || err.code) : 'unbekannt';
+    logDebug(`"error"-Event: ${codeName}${err && err.message ? ' – ' + err.message : ''} bei ${audio.src}`);
+    tryNextUrlOrFail();
+  });
 
   if ('mediaSession' in navigator) {
     navigator.mediaSession.setActionHandler('play', () => audio.play().catch(()=>{}));
@@ -1183,33 +1253,69 @@
   const btcChangeEl = document.getElementById('btcChange');
   let lastPrice = null;
 
-  async function fetchBtcPrice(){
-    try {
+  // Mehrere unabhängige, schlüssellose Kursquellen als Fallback: CoinGeckos
+  // geteiltes "Keyless"-Limit kann für alle Nutzer weltweit über längere Zeit
+  // ausgeschöpft sein (nicht nur kurz gedrosselt) – Binance und Kraken sind
+  // großzügiger limitierte, unabhängige öffentliche Marktdaten-Endpunkte.
+  const PRICE_SOURCES = [
+    async () => {
+      const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCEUR');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      const price = parseFloat(d.lastPrice);
+      const change24h = parseFloat(d.priceChangePercent);
+      if (!isFinite(price)) throw new Error('invalid price');
+      return { price, change24h: isFinite(change24h) ? change24h : null };
+    },
+    async () => {
       const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur&include_24hr_change=true');
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const price = data.bitcoin.eur;
-      const change24h = data.bitcoin.eur_24h_change;
+      const d = await res.json();
+      const price = d.bitcoin && d.bitcoin.eur;
+      if (typeof price !== 'number') throw new Error('invalid price');
+      return { price, change24h: typeof d.bitcoin.eur_24h_change === 'number' ? d.bitcoin.eur_24h_change : null };
+    },
+    async () => {
+      const res = await fetch('https://api.kraken.com/0/public/Ticker?pair=XBTEUR');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      const key = Object.keys(d.result || {})[0];
+      if (!key) throw new Error('no result');
+      const t = d.result[key];
+      const price = parseFloat(t.c[0]);
+      const open = parseFloat(t.o);
+      if (!isFinite(price)) throw new Error('invalid price');
+      const change24h = (isFinite(open) && open) ? ((price - open) / open) * 100 : null;
+      return { price, change24h };
+    }
+  ];
 
-      btcPriceEl.classList.remove('loading');
-      btcPriceEl.textContent = '€ ' + price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2});
+  async function fetchBtcPrice(){
+    for (const source of PRICE_SOURCES) {
+      try {
+        const { price, change24h } = await source();
 
-      if (typeof change24h === 'number') {
-        const up = change24h >= 0;
-        btcChangeEl.className = 'btc-change ' + (up ? 'up' : 'down');
-        btcChangeEl.innerHTML = `<span class="arrow">${up ? '▲' : '▼'}</span> ${up ? '+' : ''}${change24h.toFixed(2)}% <span style="color:var(--dim);font-weight:400;">24h</span>`;
+        btcPriceEl.classList.remove('loading');
+        btcPriceEl.textContent = '€ ' + price.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2});
+
+        if (typeof change24h === 'number' && isFinite(change24h)) {
+          const up = change24h >= 0;
+          btcChangeEl.className = 'btc-change ' + (up ? 'up' : 'down');
+          btcChangeEl.innerHTML = `<span class="arrow">${up ? '▲' : '▼'}</span> ${up ? '+' : ''}${change24h.toFixed(2)}% <span style="color:var(--dim);font-weight:400;">24h</span>`;
+        }
+        lastPrice = price;
+        return; // Erfolg – weitere Quellen müssen nicht probiert werden
+      } catch (e) {
+        // nächste Quelle versuchen
       }
-      lastPrice = price;
-    } catch (e) {
-      if (lastPrice === null) {
-        btcPriceEl.textContent = 'nicht verfügbar';
-      }
+    }
+    // Alle Quellen fehlgeschlagen
+    if (lastPrice === null) {
+      btcPriceEl.textContent = 'nicht verfügbar';
     }
   }
   fetchBtcPrice();
-  // 30s statt 10s: CoinGeckos kostenlose API erlaubt nur ~10–30 Anfragen/Minute
-  // pro IP (geteilt mit allen anderen im selben Netzwerk) – zu häufiges Abfragen
-  // führte zu "429 Too Many Requests" und damit zeitweise zu keinem Kurs.
+  // 30s statt 10s: schont die geteilten Rate-Limits der kostenlosen APIs.
   setInterval(fetchBtcPrice, 30000);
 
   /* ============ BITCOIN CHART ============ */
@@ -1259,18 +1365,40 @@
   }
 
   async function fetchBtcHistory(){
-    try {
-      const to = Math.floor(Date.now() / 1000);
-      const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=eur&from=${CHART_START}&to=${to}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      if (data && data.prices && data.prices.length) {
-        renderChart(data.prices);
+    const nowMs = Date.now();
+    const startMs = CHART_START * 1000;
+
+    const sources = [
+      async () => {
+        // Binance-Kerzen (6h-Intervall hält die Punktzahl unter dem 1000er-Limit)
+        const url = `https://api.binance.com/api/v3/klines?symbol=BTCEUR&interval=6h&startTime=${startMs}&endTime=${nowMs}&limit=1000`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        if (!Array.isArray(d) || !d.length) throw new Error('empty');
+        return d.map(k => [k[0], parseFloat(k[4])]); // [Zeit, Schlusskurs]
+      },
+      async () => {
+        const to = Math.floor(nowMs / 1000);
+        const url = `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart/range?vs_currency=eur&from=${CHART_START}&to=${to}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        if (!d || !d.prices || !d.prices.length) throw new Error('empty');
+        return d.prices;
       }
-    } catch (e) {
-      chartLoading.textContent = 'Verlauf nicht verfügbar';
+    ];
+
+    for (const source of sources) {
+      try {
+        const points = await source();
+        renderChart(points);
+        return;
+      } catch (e) {
+        // nächste Quelle versuchen
+      }
     }
+    chartLoading.textContent = 'Verlauf nicht verfügbar';
   }
   fetchBtcHistory();
   // Der Kursverlauf ändert sich innerhalb weniger Minuten kaum – alle 5 statt
