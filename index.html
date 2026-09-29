@@ -31,7 +31,12 @@
     --green:#4caf50;
     --red:#e5484d;
     --blue:#4a9de0;
-    --digit-size:clamp(34px,10vw,58px);
+    /* Fest auf das iPhone 17 Pro Max optimiert (Safari-Viewport: 440 × 956 CSS-px).
+       Rechnerisch abgesichert, damit Kompass + Uhr + Temperatur (Courier-New-
+       Monospace, "12:34:56" = 8 Zeichen) bei clock-bar-Padding 10px+10px und
+       16px Row-Gap IMMER in einer Zeile bleiben, ohne umzubrechen:
+       2×(2.15×38) Kreise + 8×0.65×38 Uhrzeit-Text + 2×16 Gaps ≈ 393px < 420px verfügbar. */
+    --digit-size:38px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
@@ -71,14 +76,15 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    flex-wrap:wrap;
-    row-gap:8px;
+    flex-wrap:nowrap;
+    white-space:nowrap;
     gap:16px;
   }
   .clock-main{
     display:flex;
     flex-direction:column;
     align-items:center;
+    flex-shrink:0;
   }
   .clock-time{
     font-size:var(--digit-size);
@@ -88,6 +94,7 @@
     line-height:1;
     font-variant-numeric:tabular-nums;
     text-shadow:0 0 18px rgba(247,147,26,.25);
+    white-space:nowrap;
   }
   .clock-time .colon{
     color:var(--btc-orange);
