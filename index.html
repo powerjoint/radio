@@ -1026,17 +1026,64 @@
     }
   }
 
+  /* ============ BILDSCHIRM WACH HALTEN BEI FAHRT ============ */
+  // Bleibt die GPS-Geschwindigkeit länger als 5s durchgehend über 2 km/h,
+  // wird der Bildschirm per Wake Lock API wach gehalten (z.B. beim Radfahren/
+  // Autofahren). Fällt die Geschwindigkeit darunter, wird der Wake Lock
+  // wieder freigegeben, damit der Bildschirm normal abschalten kann.
+  const WAKE_SPEED_THRESHOLD_KMH = 2;
+  const WAKE_HOLD_MS = 5000;
+  let wakeLock = null;
+  let aboveThresholdSince = null;
+
+  async function requestScreenWakeLock(){
+    if (!('wakeLock' in navigator) || wakeLock) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (e) {
+      wakeLock = null; // z.B. Berechtigung verweigert oder Tab im Hintergrund
+    }
+  }
+
+  function releaseScreenWakeLock(){
+    if (wakeLock) {
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+  }
+
+  // Der Wake Lock wird vom Browser automatisch freigegeben, sobald die Seite
+  // in den Hintergrund geht (z.B. Bildschirm kurz aus) – bei Rückkehr in den
+  // Vordergrund erneut anfordern, falls die Bedingung weiterhin erfüllt ist.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && aboveThresholdSince !== null
+        && (Date.now() - aboveThresholdSince) >= WAKE_HOLD_MS) {
+      requestScreenWakeLock();
+    }
+  });
+
+  function updateWakeLockForSpeed(kmh){
+    if (kmh > WAKE_SPEED_THRESHOLD_KMH) {
+      if (aboveThresholdSince === null) {
+        aboveThresholdSince = Date.now();
+      } else if (Date.now() - aboveThresholdSince >= WAKE_HOLD_MS) {
+        requestScreenWakeLock();
+      }
+    } else {
+      aboveThresholdSince = null;
+      releaseScreenWakeLock();
+    }
+  }
+
   function requestSpeedPermission(){
     if (!('geolocation' in navigator)) { compassSpeedEl.textContent = '–'; return; }
     navigator.geolocation.watchPosition(
       (pos) => {
         const speedMs = pos.coords.speed;
-        if (typeof speedMs === 'number' && speedMs >= 0 && !isNaN(speedMs)) {
-          const kmh = speedMs * 3.6;
-          compassSpeedEl.textContent = Math.round(kmh).toString();
-        } else {
-          compassSpeedEl.textContent = '0';
-        }
+        const kmh = (typeof speedMs === 'number' && speedMs >= 0 && !isNaN(speedMs)) ? speedMs * 3.6 : 0;
+        compassSpeedEl.textContent = Math.round(kmh).toString();
+        updateWakeLockForSpeed(kmh);
       },
       () => { compassSpeedEl.textContent = '–'; },
       { enableHighAccuracy:true, maximumAge:2000, timeout:10000 }
