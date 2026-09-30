@@ -293,6 +293,13 @@
   }
   .bike-map .leaflet-control-attribution a{color:var(--btc-orange-dim) !important;}
 
+  /* Nachtmodus: reine CSS-Invertierung der Kachel-Ebene (kein zweiter
+     Kartendienst nötig, der ggf. einen API-Key verlangen würde). Marker und
+     Peilstrahl liegen in anderen Leaflet-"Panes" und bleiben unbeeinflusst. */
+  .page-map.map-night .bike-map .leaflet-tile-pane{
+    filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9);
+  }
+
   .map-loading{
     position:absolute;
     inset:0;
@@ -1483,22 +1490,16 @@
       </div>`;
   }
 
-  const TILE_URL_DAY = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const TILE_URL_NIGHT = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-  const ATTR_DAY = '© OpenStreetMap';
-  const ATTR_NIGHT = '© OpenStreetMap © CARTO';
+  // Nur schlüssellose OpenStreetMap-Kacheln – ein zweiter Kartendienst (z.B.
+  // CARTO) würde inzwischen einen eigenen API-Key verlangen ("API KEY
+  // REQUIRED"). Der Nachtmodus wird stattdessen rein per CSS-Filter auf die
+  // Kachel-Ebene erzeugt (Invertierung) – Marker/Peilstrahl bleiben davon
+  // unberührt, da der Filter nur auf ".leaflet-tile-pane" wirkt.
+  const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const TILE_ATTR = '© OpenStreetMap';
 
   function applyMapTheme(night){
-    const changed = nightModeActive !== night;
     nightModeActive = night;
-    if (bikeTileLayer) {
-      bikeTileLayer.setUrl(night ? TILE_URL_NIGHT : TILE_URL_DAY);
-      if (changed && bikeMap && bikeMap.attributionControl) {
-        bikeMap.attributionControl.removeAttribution(ATTR_DAY);
-        bikeMap.attributionControl.removeAttribution(ATTR_NIGHT);
-        bikeMap.attributionControl.addAttribution(night ? ATTR_NIGHT : ATTR_DAY);
-      }
-    }
     if (pageMap) pageMap.classList.toggle('map-night', night);
   }
 
@@ -1513,12 +1514,11 @@
     const hourNow = new Date().getHours();
     const initialNight = nightModeActive || hourNow < 6 || hourNow >= 21;
 
-    bikeTileLayer = L.tileLayer(initialNight ? TILE_URL_NIGHT : TILE_URL_DAY, {
+    bikeTileLayer = L.tileLayer(TILE_URL, {
       maxZoom: 19,
-      attribution: initialNight ? ATTR_NIGHT : ATTR_DAY
+      attribution: TILE_ATTR
     }).addTo(bikeMap);
-    pageMap.classList.toggle('map-night', initialNight);
-    nightModeActive = initialNight;
+    applyMapTheme(initialNight);
 
     const icon = L.divIcon({
       className: 'bike-marker-icon',
