@@ -87,7 +87,16 @@
     flex-direction:column;
     align-items:center;
     flex-shrink:0;
+    cursor:pointer;
+    user-select:none;
+    -webkit-user-select:none;
   }
+  .clock-toggle-icon{
+    width:26px;height:9px;
+    color:#55554f;
+    margin-bottom:2px;
+  }
+  .clock-main:active .clock-toggle-icon{color:var(--btc-orange);}
   .clock-time{
     font-size:var(--digit-size);
     font-weight:700;
@@ -325,6 +334,29 @@
   }
   .map-center-btn:active{transform:scale(.92);}
   .map-center-btn svg{width:22px;height:22px;}
+
+  .map-legend{
+    position:absolute;
+    left:50%;
+    bottom:calc(20px + env(safe-area-inset-bottom, 0px));
+    transform:translateX(-50%);
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:7px 12px;
+    border-radius:20px;
+    background:rgba(15,15,13,.88);
+    border:1px solid var(--btc-orange-dim);
+    color:var(--off-white);
+    font-size:10.5px;
+    letter-spacing:.02em;
+    white-space:nowrap;
+    box-shadow:0 2px 10px rgba(0,0,0,.45);
+    z-index:9;
+    pointer-events:none;
+  }
+  .map-legend svg{width:20px;height:4px;flex-shrink:0;}
+  .map-legend line{stroke:var(--btc-orange);stroke-width:3;stroke-linecap:round;}
 
   /* Eigene Position: Dreieck (Blickrichtung) + Peilstrahl (5-Minuten-Reichweite) */
   .bike-marker{
@@ -682,7 +714,11 @@
         <span class="compass-speed-unit">km/h</span>
       </div>
     </div>
-    <div class="clock-main">
+    <div class="clock-main" id="clockPageToggle" role="button" tabindex="0" aria-label="Zwischen Startseite und Fahrradkarte wechseln">
+      <svg class="clock-toggle-icon" viewBox="0 0 40 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="14,2 6,7 14,12"/>
+        <polyline points="26,2 34,7 26,12"/>
+      </svg>
       <div class="clock-time" id="clockTime">--:--:--</div>
       <div class="clock-date" id="clockDate">-</div>
     </div>
@@ -813,6 +849,11 @@
         <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
       </svg>
     </button>
+
+    <div class="map-legend" id="mapLegend">
+      <svg viewBox="0 0 24 4"><line x1="1" y1="2" x2="23" y2="2"/></svg>
+      <span>Strecke in 5 Min. bei aktuellem Tempo</span>
+    </div>
   </section>
 
 </div>
@@ -1363,10 +1404,29 @@
   // wirklich aktiv angezeigt wird – das spart Datenvolumen, wenn man die
   // Karte gar nicht braucht.
   const pager = document.getElementById('pager');
+  const pageHomeEl = document.getElementById('pageHome');
   const pageMap = document.getElementById('pageMap');
   const mapLoadingEl = document.getElementById('mapLoading');
   const mapCenterBtn = document.getElementById('mapCenterBtn');
   const pageDotEls = document.querySelectorAll('.page-dot');
+  const clockPageToggle = document.getElementById('clockPageToggle');
+
+  let activePageIndex = 0;
+
+  function goToPage(idx){
+    pager.scrollTo({ left: idx * pager.clientWidth, behavior: 'smooth' });
+  }
+
+  // Einmal zurückgeswiped, fängt Leaflet die Zieh-Geste für sich selbst ab
+  // (Karte verschiebt sich statt die Seite zu wechseln). Deshalb zusätzlich
+  // ein Klick auf die Uhr als zuverlässiger Umschalter in beide Richtungen –
+  // der dünne Doppelpfeil darüber zeigt das an.
+  clockPageToggle.addEventListener('click', () => {
+    goToPage(activePageIndex === 0 ? 1 : 0);
+  });
+  clockPageToggle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goToPage(activePageIndex === 0 ? 1 : 0); }
+  });
 
   let bikeMap = null;
   let bikeMarkerEl = null;
@@ -1374,6 +1434,8 @@
   let bikeRay = null;
   let mapLoadStarted = false;
   let followMode = true; // true = Karte zentriert automatisch auf die Position
+  let nightModeActive = false;
+  let bikeTileLayer = null;
 
   function loadScript(src){
     return new Promise((resolve, reject) => {
@@ -1421,16 +1483,42 @@
       </div>`;
   }
 
+  const TILE_URL_DAY = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const TILE_URL_NIGHT = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  const ATTR_DAY = '© OpenStreetMap';
+  const ATTR_NIGHT = '© OpenStreetMap © CARTO';
+
+  function applyMapTheme(night){
+    const changed = nightModeActive !== night;
+    nightModeActive = night;
+    if (bikeTileLayer) {
+      bikeTileLayer.setUrl(night ? TILE_URL_NIGHT : TILE_URL_DAY);
+      if (changed && bikeMap && bikeMap.attributionControl) {
+        bikeMap.attributionControl.removeAttribution(ATTR_DAY);
+        bikeMap.attributionControl.removeAttribution(ATTR_NIGHT);
+        bikeMap.attributionControl.addAttribution(night ? ATTR_NIGHT : ATTR_DAY);
+      }
+    }
+    if (pageMap) pageMap.classList.toggle('map-night', night);
+  }
+
   function initBikeMap(){
     const startPos = lastKnownPos || { lat: 51.1657, lng: 10.4515 }; // Fallback: Mitte Deutschland
 
     bikeMap = L.map('bikeMap', { zoomControl: false, attributionControl: true })
       .setView([startPos.lat, startPos.lng], 16);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Falls noch kein Wetter-Fetch (mit Sonnenauf-/-untergang) stattgefunden
+    // hat, grob nach Uhrzeit schätzen, bis die genauen Zeiten vorliegen.
+    const hourNow = new Date().getHours();
+    const initialNight = nightModeActive || hourNow < 6 || hourNow >= 21;
+
+    bikeTileLayer = L.tileLayer(initialNight ? TILE_URL_NIGHT : TILE_URL_DAY, {
       maxZoom: 19,
-      attribution: '© OpenStreetMap'
+      attribution: initialNight ? ATTR_NIGHT : ATTR_DAY
     }).addTo(bikeMap);
+    pageMap.classList.toggle('map-night', initialNight);
+    nightModeActive = initialNight;
 
     const icon = L.divIcon({
       className: 'bike-marker-icon',
@@ -1510,6 +1598,7 @@
     entries.forEach(entry => {
       const idx = entry.target === pageMap ? 1 : 0;
       if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+        activePageIndex = idx;
         pageDotEls.forEach((dot, i) => dot.classList.toggle('active', i === idx));
         if (idx === 1) {
           ensureMapLoaded();
@@ -1518,7 +1607,7 @@
       }
     });
   }, { root: pager, threshold: [0, 0.5, 1] });
-  pageObserver.observe(document.getElementById('pageHome'));
+  pageObserver.observe(pageHomeEl);
   pageObserver.observe(pageMap);
 
   /* ============ WEATHER / RAIN COUNTDOWN ============ */
@@ -1610,7 +1699,7 @@
       rainCountdownEl.className = 'rain-countdown no-rain';
       setWeatherIcon('cloud');
 
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation_probability,precipitation&current=temperature_2m&forecast_days=2&timezone=auto`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation_probability,precipitation&current=temperature_2m&daily=sunrise,sunset&forecast_days=2&timezone=auto`;
       const res = await fetch(url);
       const data = await res.json();
       const times = data.hourly.time;
@@ -1619,6 +1708,16 @@
 
       if (data.current && typeof data.current.temperature_2m === 'number') {
         tempValEl.textContent = Math.round(data.current.temperature_2m).toString();
+      }
+
+      // Nachtmodus für die Fahrradkarte: dunkel, sobald es vor Sonnenaufgang
+      // oder nach Sonnenuntergang ist (Zeiten kommen bereits in Ortszeit dank
+      // "timezone=auto").
+      if (data.daily && data.daily.sunrise && data.daily.sunrise[0] && data.daily.sunset && data.daily.sunset[0]) {
+        const nowT = new Date();
+        const sunrise = new Date(data.daily.sunrise[0]);
+        const sunset = new Date(data.daily.sunset[0]);
+        applyMapTheme(nowT < sunrise || nowT > sunset);
       }
 
       const now = new Date();
