@@ -370,6 +370,133 @@
   .map-legend svg{width:20px;height:4px;flex-shrink:0;}
   .map-legend line{stroke:var(--btc-orange);stroke-width:3;stroke-linecap:round;}
 
+  /* ===== WEGPUNKTE ===== */
+  .map-io-btn{
+    position:absolute;
+    left:calc(14px + env(safe-area-inset-left, 0px));
+    bottom:calc(20px + env(safe-area-inset-bottom, 0px));
+    width:46px;height:46px;
+    border-radius:50%;
+    border:1px solid var(--btc-orange-dim);
+    background:rgba(15,15,13,.92);
+    color:var(--btc-orange);
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 10px rgba(0,0,0,.5);
+    cursor:pointer;
+    z-index:10;
+  }
+  .map-io-btn:active{transform:scale(.92);}
+  .map-io-btn svg{width:21px;height:21px;}
+
+  .sheet-backdrop{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,.5);
+    z-index:29;
+    transition:opacity .2s;
+  }
+  .sheet-backdrop.hidden{opacity:0;pointer-events:none;}
+
+  .waypoint-sheet{
+    position:absolute;
+    left:0;right:0;bottom:0;
+    z-index:30;
+    background:#111110;
+    border-top:1px solid var(--btc-orange-dim);
+    border-radius:16px 16px 0 0;
+    padding:16px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    box-shadow:0 -4px 24px rgba(0,0,0,.5);
+    transition:transform .25s ease-out, opacity .2s;
+  }
+  .waypoint-sheet.hidden{
+    transform:translateY(100%);
+    opacity:0;
+    pointer-events:none;
+  }
+  .sheet-title{
+    font-size:15px;
+    font-weight:700;
+    color:var(--off-white);
+    margin-bottom:12px;
+    text-align:center;
+  }
+  .sheet-hint{
+    font-size:11.5px;
+    line-height:1.5;
+    color:var(--dim);
+    margin-bottom:16px;
+    text-align:center;
+  }
+  .waypoint-name-input{
+    width:100%;
+    background:#0a0a09;
+    border:1px solid #2b2b28;
+    border-radius:10px;
+    padding:11px 13px;
+    color:var(--off-white);
+    font-family:inherit;
+    font-size:15px;
+    margin-bottom:14px;
+  }
+  .waypoint-name-input:focus{outline:none; border-color:var(--btc-orange-dim);}
+  .waypoint-icon-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    justify-content:center;
+    margin-bottom:16px;
+  }
+  .waypoint-icon-btn{
+    width:40px;height:40px;
+    border-radius:50%;
+    border:1.5px solid #2b2b28;
+    background:#0a0a09;
+    font-size:19px;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .waypoint-icon-btn.selected{
+    border-color:var(--btc-orange);
+    background:rgba(247,147,26,.12);
+  }
+  .sheet-actions{
+    display:flex;
+    gap:10px;
+  }
+  .sheet-actions-column{margin-bottom:10px;}
+  .sheet-btn{
+    flex:1;
+    padding:12px 10px;
+    border-radius:10px;
+    border:1px solid #2b2b28;
+    background:#1a1a18;
+    color:var(--off-white);
+    font-family:inherit;
+    font-size:13.5px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .sheet-btn:active{transform:scale(.97);}
+  .sheet-btn.hidden{display:none;}
+  .sheet-btn-save{background:var(--btc-orange); border-color:var(--btc-orange); color:#1a1206;}
+  .sheet-btn-delete{background:#2a1210; border-color:#5c231d; color:#ff8a80;}
+  .sheet-btn-cancel{background:transparent;}
+
+  .waypoint-marker{
+    display:flex;align-items:center;justify-content:center;
+    width:30px;height:30px;
+    border-radius:50% 50% 50% 0;
+    transform:rotate(-45deg);
+    background:#1a1a18;
+    border:1.5px solid var(--btc-orange);
+    box-shadow:0 2px 6px rgba(0,0,0,.5);
+  }
+  .waypoint-marker span{
+    transform:rotate(45deg);
+    font-size:15px;
+    line-height:1;
+  }
+
   /* Eigene Position: Dreieck (Blickrichtung) + Peilstrahl (5-Minuten-Reichweite) */
   .bike-marker{
     width:26px;height:26px;
@@ -855,6 +982,14 @@
       <div>Karte wird geladen…</div>
     </div>
 
+    <button class="map-io-btn" id="mapIoBtn" aria-label="Wegpunkte exportieren/importieren">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 2v6h6"/>
+        <path d="M9 15l3-3 3 3M12 12v7"/>
+      </svg>
+    </button>
+
     <button class="map-center-btn" id="mapCenterBtn" aria-label="Auf eigene Position zentrieren">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="3"/>
@@ -865,6 +1000,33 @@
     <div class="map-legend" id="mapLegend">
       <svg viewBox="0 0 24 4"><line x1="1" y1="2" x2="23" y2="2"/></svg>
       <span>Strecke in 5 Min. bei aktuellem Tempo</span>
+    </div>
+
+    <input type="file" id="waypointImportInput" accept=".txt,text/plain" style="display:none">
+
+    <div class="sheet-backdrop hidden" id="sheetBackdrop"></div>
+
+    <div class="waypoint-sheet hidden" id="waypointSheet">
+      <div class="sheet-title" id="waypointSheetTitle">Neuer Wegpunkt</div>
+      <input type="text" id="waypointNameInput" class="waypoint-name-input" placeholder="Name (z.B. „Rastplatz“)" maxlength="40">
+      <div class="waypoint-icon-row" id="waypointIconRow"></div>
+      <div class="sheet-actions">
+        <button class="sheet-btn sheet-btn-delete hidden" id="waypointDeleteBtn">Löschen</button>
+        <button class="sheet-btn sheet-btn-cancel" id="waypointCancelBtn">Abbrechen</button>
+        <button class="sheet-btn sheet-btn-save" id="waypointSaveBtn">Speichern</button>
+      </div>
+    </div>
+
+    <div class="waypoint-sheet hidden" id="waypointIoSheet">
+      <div class="sheet-title">Wegpunkte</div>
+      <div class="sheet-hint">Wegpunkte bleiben auf diesem Gerät gespeichert – auch nach dem Schließen der App und nach App-Updates. Zum Sichern, Übertragen oder händischen Bearbeiten als Textdatei exportieren/importieren.</div>
+      <div class="sheet-actions sheet-actions-column">
+        <button class="sheet-btn sheet-btn-save" id="waypointExportBtn">Als Textdatei exportieren</button>
+        <button class="sheet-btn" id="waypointImportBtn">Aus Textdatei importieren</button>
+      </div>
+      <div class="sheet-actions">
+        <button class="sheet-btn sheet-btn-cancel" id="waypointIoCloseBtn">Schließen</button>
+      </div>
     </div>
   </section>
 
@@ -1542,6 +1704,9 @@
     // Zentrieren, damit man die Karte frei erkunden kann.
     bikeMap.on('dragstart zoomstart', () => { followMode = false; });
 
+    renderWaypoints();
+    attachLongPressHandler();
+
     mapLoadingEl.classList.add('hidden');
     updateBikeMapMarker();
 
@@ -1599,6 +1764,223 @@
     if (bikeMap && lastKnownPos) {
       bikeMap.setView([lastKnownPos.lat, lastKnownPos.lng], bikeMap.getZoom(), { animate: true });
     }
+  });
+
+  /* ============ WEGPUNKTE ============ */
+  // Hinweis zur Technik: Eine reine Web-App kann keine Datei serverseitig
+  // "neben sich selbst" anlegen oder automatisch pflegen – das könnte nur ein
+  // Server-Programm. Als praktisches Äquivalent werden Wegpunkte daher lokal
+  // auf dem Gerät gespeichert (localStorage – bleibt auch nach Schließen der
+  // App UND nach einem Update der Seite erhalten, da es an den Gerät+Domain
+  // gebunden ist, nicht an die Datei) und können zusätzlich jederzeit als
+  // echte, von Hand bearbeitbare .txt-Datei exportiert/importiert werden.
+  const WAYPOINT_STORAGE_KEY = 'bikeWaypoints';
+  const WAYPOINT_ICONS = ['📍','🏠','⭐','☕','🚲','⚠️','🅿️','💧','🍺','🛠️','🏁','🌳'];
+
+  let waypoints = [];
+  try { waypoints = JSON.parse(localStorage.getItem(WAYPOINT_STORAGE_KEY) || '[]'); } catch (e) { waypoints = []; }
+
+  function saveWaypoints(){
+    try { localStorage.setItem(WAYPOINT_STORAGE_KEY, JSON.stringify(waypoints)); } catch (e) {}
+  }
+
+  const sheetBackdrop = document.getElementById('sheetBackdrop');
+  const waypointSheet = document.getElementById('waypointSheet');
+  const waypointSheetTitle = document.getElementById('waypointSheetTitle');
+  const waypointNameInput = document.getElementById('waypointNameInput');
+  const waypointIconRow = document.getElementById('waypointIconRow');
+  const waypointSaveBtn = document.getElementById('waypointSaveBtn');
+  const waypointDeleteBtn = document.getElementById('waypointDeleteBtn');
+  const waypointCancelBtn = document.getElementById('waypointCancelBtn');
+  const mapIoBtn = document.getElementById('mapIoBtn');
+  const waypointIoSheet = document.getElementById('waypointIoSheet');
+  const waypointExportBtn = document.getElementById('waypointExportBtn');
+  const waypointImportBtn = document.getElementById('waypointImportBtn');
+  const waypointIoCloseBtn = document.getElementById('waypointIoCloseBtn');
+  const waypointImportInput = document.getElementById('waypointImportInput');
+
+  let waypointLayer = null;       // Leaflet-Layergruppe für alle Wegpunkt-Marker
+  let editingWaypointId = null;   // null = neuer Wegpunkt, sonst Bearbeitung
+  let editingLatLng = null;
+  let selectedIcon = WAYPOINT_ICONS[0];
+
+  // Icon-Auswahlreihe einmalig aufbauen (unabhängig davon, ob die Karte
+  // schon geladen ist)
+  WAYPOINT_ICONS.forEach(icon => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'waypoint-icon-btn';
+    btn.textContent = icon;
+    btn.addEventListener('click', () => {
+      selectedIcon = icon;
+      waypointIconRow.querySelectorAll('.waypoint-icon-btn').forEach(b => b.classList.toggle('selected', b === btn));
+    });
+    waypointIconRow.appendChild(btn);
+  });
+
+  function openSheet(el){ sheetBackdrop.classList.remove('hidden'); el.classList.remove('hidden'); }
+  function closeSheets(){
+    sheetBackdrop.classList.add('hidden');
+    waypointSheet.classList.add('hidden');
+    waypointIoSheet.classList.add('hidden');
+  }
+  sheetBackdrop.addEventListener('click', closeSheets);
+
+  function openWaypointEditor(latlng, existing){
+    editingLatLng = latlng;
+    editingWaypointId = existing ? existing.id : null;
+    waypointSheetTitle.textContent = existing ? 'Wegpunkt bearbeiten' : 'Neuer Wegpunkt';
+    waypointNameInput.value = existing ? existing.name : '';
+    selectedIcon = existing ? existing.icon : WAYPOINT_ICONS[0];
+    waypointIconRow.querySelectorAll('.waypoint-icon-btn').forEach(b => b.classList.toggle('selected', b.textContent === selectedIcon));
+    waypointDeleteBtn.classList.toggle('hidden', !existing);
+    openSheet(waypointSheet);
+    setTimeout(() => waypointNameInput.focus(), 150);
+  }
+
+  waypointCancelBtn.addEventListener('click', closeSheets);
+
+  waypointSaveBtn.addEventListener('click', () => {
+    const name = waypointNameInput.value.trim() || 'Wegpunkt';
+    if (editingWaypointId) {
+      const wp = waypoints.find(w => w.id === editingWaypointId);
+      if (wp) { wp.name = name; wp.icon = selectedIcon; }
+    } else if (editingLatLng) {
+      waypoints.push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        lat: editingLatLng.lat,
+        lng: editingLatLng.lng,
+        name,
+        icon: selectedIcon
+      });
+    }
+    saveWaypoints();
+    renderWaypoints();
+    closeSheets();
+  });
+
+  waypointDeleteBtn.addEventListener('click', () => {
+    if (!editingWaypointId) return;
+    waypoints = waypoints.filter(w => w.id !== editingWaypointId);
+    saveWaypoints();
+    renderWaypoints();
+    closeSheets();
+  });
+
+  function waypointMarkerHtml(icon){
+    return `<div class="waypoint-marker"><span>${icon}</span></div>`;
+  }
+
+  function renderWaypoints(){
+    if (!bikeMap) return;
+    if (!waypointLayer) waypointLayer = L.layerGroup().addTo(bikeMap);
+    waypointLayer.clearLayers();
+    waypoints.forEach(wp => {
+      const marker = L.marker([wp.lat, wp.lng], {
+        icon: L.divIcon({
+          className: 'waypoint-marker-icon',
+          html: waypointMarkerHtml(wp.icon),
+          iconSize: [30, 30],
+          iconAnchor: [15, 29]
+        })
+      });
+      marker.on('click', () => openWaypointEditor({ lat: wp.lat, lng: wp.lng }, wp));
+      marker.addTo(waypointLayer);
+    });
+  }
+
+  // Gedrückt halten auf der Karte -> neuer Wegpunkt an dieser Stelle.
+  // Per Hand über Pointer-Events erkannt (nicht per Leaflet-"contextmenu"),
+  // damit es zuverlässig auf iOS per Touch funktioniert und ein normales
+  // Ziehen/Zoomen nicht versehentlich als Halten gewertet wird.
+  function attachLongPressHandler(){
+    const container = bikeMap.getContainer();
+    const LONG_PRESS_MS = 550;
+    const MOVE_CANCEL_PX = 10;
+    let pressTimer = null;
+    let startPoint = null;
+
+    function cancelPress(){
+      clearTimeout(pressTimer);
+      pressTimer = null;
+      startPoint = null;
+    }
+
+    container.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startPoint = { x: e.clientX, y: e.clientY };
+      pressTimer = setTimeout(() => {
+        const rect = container.getBoundingClientRect();
+        const point = L.point(startPoint.x - rect.left, startPoint.y - rect.top);
+        const latlng = bikeMap.containerPointToLatLng(point);
+        if (navigator.vibrate) navigator.vibrate(15);
+        openWaypointEditor(latlng, null);
+        startPoint = null;
+      }, LONG_PRESS_MS);
+    });
+    container.addEventListener('pointermove', (e) => {
+      if (!startPoint) return;
+      const dx = e.clientX - startPoint.x, dy = e.clientY - startPoint.y;
+      if (Math.sqrt(dx * dx + dy * dy) > MOVE_CANCEL_PX) cancelPress();
+    });
+    container.addEventListener('pointerup', cancelPress);
+    container.addEventListener('pointercancel', cancelPress);
+  }
+
+  // ---- Export / Import als Textdatei ----
+  mapIoBtn.addEventListener('click', () => openSheet(waypointIoSheet));
+  waypointIoCloseBtn.addEventListener('click', closeSheets);
+
+  function waypointsToText(){
+    // Ein Wegpunkt pro Zeile, gut von Hand lesbar/editierbar: lat,lng,icon,name
+    return waypoints.map(w => `${w.lat},${w.lng},${w.icon},${w.name}`).join('\n');
+  }
+
+  function parseWaypointsText(text){
+    const parsed = [];
+    text.split(/\r?\n/).forEach(line => {
+      const t = line.trim();
+      if (!t) return;
+      const parts = t.split(',');
+      if (parts.length < 4) return;
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      const icon = parts[2].trim() || '📍';
+      const name = parts.slice(3).join(',').trim() || 'Wegpunkt';
+      if (isFinite(lat) && isFinite(lng)) {
+        parsed.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), lat, lng, icon, name });
+      }
+    });
+    return parsed;
+  }
+
+  waypointExportBtn.addEventListener('click', () => {
+    const blob = new Blob([waypointsToText()], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'wegpunkte.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+
+  waypointImportBtn.addEventListener('click', () => waypointImportInput.click());
+  waypointImportInput.addEventListener('change', () => {
+    const file = waypointImportInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const imported = parseWaypointsText(String(reader.result));
+      // Vorhandene Wegpunkte bleiben erhalten, importierte werden ergänzt.
+      waypoints = waypoints.concat(imported);
+      saveWaypoints();
+      renderWaypoints();
+      closeSheets();
+    };
+    reader.readAsText(file);
+    waypointImportInput.value = '';
   });
 
   // Wischen erkennen: sobald Seite 2 (Karte) zu >50% sichtbar ist, Karte
