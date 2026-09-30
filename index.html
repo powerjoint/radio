@@ -39,7 +39,7 @@
     --digit-size:38px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;}
+  html,body{height:100%; background:var(--bg-0); overscroll-behavior:none;}
   body{
     margin:0;
     height:100dvh;
@@ -262,6 +262,7 @@
     scroll-snap-type:x mandatory;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none;
+    overscroll-behavior-x:contain;
   }
   .pager::-webkit-scrollbar{display:none;}
   .page{
@@ -273,6 +274,7 @@
     overflow-y:auto;
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
+    overscroll-behavior-y:contain;
     display:flex;
     flex-direction:column;
     align-items:center;
@@ -285,6 +287,9 @@
     position:absolute;
     inset:0;
     background:#0a0a0a;
+    z-index:1; /* eigener Stapelkontext, damit Leaflets interne Panes
+                  (z-index 200–700) nicht über Geschwister-Elemente wie den
+                  Zentrieren-Button (z-index:10) hinausragen */
   }
   .bike-map .leaflet-control-attribution{
     background:rgba(10,10,10,.7) !important;
