@@ -1500,8 +1500,11 @@
   // REQUIRED"). Der Nachtmodus wird stattdessen rein per CSS-Filter auf die
   // Kachel-Ebene erzeugt (Invertierung) – Marker/Peilstrahl bleiben davon
   // unberührt, da der Filter nur auf ".leaflet-tile-pane" wirkt.
-  const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const TILE_ATTR = '© OpenStreetMap';
+  // CyclOSM: eine auf Radfahrer zugeschnittene, weiterhin schlüssellose
+  // OpenStreetMap-Kartendarstellung mit hervorgehobenen Radwegen und meist
+  // größer/klarer gesetzten Beschriftungen als die Standard-OSM-Kacheln.
+  const TILE_URL = 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png';
+  const TILE_ATTR = '© OpenStreetMap contributors, Tiles: OpenStreetMap France';
 
   function applyMapTheme(night){
     nightModeActive = night;
@@ -1520,7 +1523,8 @@
     const initialNight = nightModeActive || hourNow < 6 || hourNow >= 21;
 
     bikeTileLayer = L.tileLayer(TILE_URL, {
-      maxZoom: 19,
+      subdomains: 'abc',
+      maxZoom: 20,
       attribution: TILE_ATTR
     }).addTo(bikeMap);
     applyMapTheme(initialNight);
