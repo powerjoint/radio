@@ -1096,23 +1096,100 @@
       urls: ['https://stream.joe.nl/joe/mp3'] },
     { key: 'swr3',   label: 'Deutschland', title: 'SWR3',               freq: 'MEHR HITS',
       urls: ['https://liveradio.swr.de/sw282p3/swr3/play.mp3'] },
-    { key: 'reggae', label: 'SomaFM',      title: 'Heavyweight Reggae', freq: 'REGGAE • DUB • SKA',
-      // Frisch von somafm.com/reggae/directstreamlinks.html abgerufen (Stand: heute).
-      // Vorheriger Fehler: "ice3" als Alt-Server existiert für diesen Kanal gar nicht,
-      // korrekt sind laut offizieller Seite nur die Server ice5 (Haupt) und ice2 (Alt).
-      urls: [
-        'https://ice5.somafm.com/reggae-128-mp3',
-        'https://ice2.somafm.com/reggae-128-mp3',
-        'https://ice5.somafm.com/reggae-256-mp3',
-        'https://ice2.somafm.com/reggae-256-mp3',
-        'https://ice5.somafm.com/reggae-128-aac',
-        'https://ice2.somafm.com/reggae-128-aac',
-        'https://ice5.somafm.com/reggae-80-aac',
-        'https://ice2.somafm.com/reggae-80-aac'
-      ] }
+    { key: 'news',   label: 'Nachrichten', title: 'Weltnachrichten',    freq: 'POLITIK • WIRTSCHAFT • FINANZEN',
+      // Kein Audio-Stream: Schlagzeilen der letzten 12h werden geladen und
+      // per Sprachausgabe vorgelesen (type:'tts', siehe weiter unten).
+      type: 'tts' }
   ];
   const N = STATIONS.length;
   const stationByKey = key => STATIONS.find(s => s.key === key);
+
+  /* ============ NACHRICHTEN-SENDER (Sprachausgabe statt Stream) ============ */
+  // Kein echter KI-Aufruf möglich ohne eigenen Server/API-Key (würde Kosten
+  // und ein Sicherheitsrisiko bedeuten). Stattdessen: echte, aktuelle
+  // Schlagzeilen aus kostenlosen Tagesschau-RSS-Feeds (Politik + Wirtschaft),
+  // auf die letzten 12 Stunden gefiltert, zu einem kurzen gesprochenen
+  // Überblick zusammengefasst und per Sprachausgabe (Web Speech API) vorgelesen.
+  const NEWS_FEEDS = [
+    'https://www.tagesschau.de/xml/rss2/',
+    'https://www.tagesschau.de/wirtschaft/index~rss2.xml'
+  ];
+  let newsUtterance = null;
+
+  async function fetchNewsHeadlines(){
+    let allItems = [];
+    for (const feedUrl of NEWS_FEEDS) {
+      try {
+        const res = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl));
+        if (!res.ok) continue;
+        const data = await res.json();
+        if (data && Array.isArray(data.items)) allItems = allItems.concat(data.items);
+      } catch (e) { /* diese Quelle überspringen, nächste versuchen */ }
+    }
+
+    const twelveHoursAgo = Date.now() - 12 * 60 * 60 * 1000;
+    let recent = allItems.filter(it => {
+      const t = new Date(it.pubDate).getTime();
+      return isFinite(t) && t >= twelveHoursAgo;
+    });
+    if (recent.length === 0) recent = allItems; // Feeds evtl. seltener aktualisiert -> trotzdem Neuestes nehmen
+
+    recent.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+
+    const seen = new Set();
+    const headlines = [];
+    for (const it of recent) {
+      const title = (it.title || '').trim();
+      if (!title || seen.has(title)) continue;
+      seen.add(title);
+      headlines.push(title);
+      if (headlines.length >= 8) break;
+    }
+    return headlines;
+  }
+
+  function buildNewsScript(headlines){
+    if (!headlines.length) return 'Aktuell konnten keine Nachrichten geladen werden.';
+    const intro = 'Hier sind die wichtigsten Nachrichten der letzten zwölf Stunden aus Politik, Wirtschaft und Finanzen. ';
+    return intro + headlines.map((h, i) => `${i + 1}. ${h}.`).join(' ');
+  }
+
+  function speakNewsScript(text){
+    if (!('speechSynthesis' in window)) {
+      statusText.textContent = 'Sprachausgabe nicht unterstützt';
+      return;
+    }
+    window.speechSynthesis.cancel();
+    newsUtterance = new SpeechSynthesisUtterance(text);
+    newsUtterance.lang = 'de-DE';
+    newsUtterance.rate = 1;
+    newsUtterance.onend = () => {
+      statusText.textContent = 'Bereit';
+      liveDot.classList.remove('live');
+      playIcon.style.display = '';
+      pauseIcon.style.display = 'none';
+      playBtn.classList.remove('playing');
+    };
+    newsUtterance.onerror = () => { statusText.textContent = 'Fehler'; };
+    window.speechSynthesis.speak(newsUtterance);
+
+    statusText.textContent = 'Live';
+    liveDot.classList.add('live');
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = '';
+    playBtn.classList.add('playing');
+    updateMediaSession();
+  }
+
+  async function playNewsStation(){
+    statusText.textContent = 'Lade Nachrichten…';
+    try {
+      const headlines = await fetchNewsHeadlines();
+      speakNewsScript(buildNewsScript(headlines));
+    } catch (e) {
+      statusText.textContent = 'Fehler';
+    }
+  }
 
   const audio = document.getElementById('audio');
   const playBtn = document.getElementById('playBtn');
@@ -1256,8 +1333,24 @@
     if (!station) return;
     lastAutoplayIntent = opts.autoplay !== false;
     currentStation = key;
-    currentUrlIndex = 0;
     logDebug(`--- Sender gewählt: ${station.title} ---`);
+
+    // Sauberer Wechsel: die jeweils andere Wiedergabeart (Stream oder
+    // Sprachausgabe) stoppen, bevor die neue beginnt.
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    if (!audio.paused) audio.pause();
+
+    if (station.type === 'tts') {
+      updateNowPlaying();
+      if (lastAutoplayIntent) {
+        playNewsStation();
+      } else {
+        statusText.textContent = 'Bereit';
+      }
+      return;
+    }
+
+    currentUrlIndex = 0;
     loadCurrentUrl();
   }
 
@@ -1308,6 +1401,31 @@
 
   function togglePlay(){
     if (!currentStation) return;
+    const station = stationByKey(currentStation);
+
+    if (station && station.type === 'tts') {
+      if (!('speechSynthesis' in window)) { statusText.textContent = 'Nicht unterstützt'; return; }
+      const synth = window.speechSynthesis;
+      if (synth.speaking && !synth.paused) {
+        synth.pause();
+        statusText.textContent = 'Pausiert';
+        liveDot.classList.remove('live');
+        playIcon.style.display = '';
+        pauseIcon.style.display = 'none';
+        playBtn.classList.remove('playing');
+      } else if (synth.paused) {
+        synth.resume();
+        statusText.textContent = 'Live';
+        liveDot.classList.add('live');
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = '';
+        playBtn.classList.add('playing');
+      } else {
+        playNewsStation(); // nichts läuft mehr (z.B. nach Ende) -> neu laden & vorlesen
+      }
+      return;
+    }
+
     if (audio.paused) {
       lastAutoplayIntent = true;
       armStallTimer();
@@ -2125,6 +2243,11 @@
   mapIoBtn.addEventListener('click', () => openSheet(waypointIoSheet));
   waypointIoCloseBtn.addEventListener('click', closeSheets);
 
+  function waypointFileTimestamp(){
+    const d = new Date();
+    return d.getFullYear().toString() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  }
+
   function waypointsToText(){
     // Ein Wegpunkt pro Zeile, gut von Hand lesbar/editierbar: lat,lng,icon,name
     return waypoints.map(w => `${w.lat},${w.lng},${w.icon},${w.name}`).join('\n');
@@ -2153,7 +2276,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'wegpunkte.txt';
+    a.download = waypointFileTimestamp() + '_wpkt_radioApp.txt';
     document.body.appendChild(a);
     a.click();
     a.remove();
