@@ -2284,16 +2284,27 @@
     return parsed;
   }
 
-  waypointExportBtn.addEventListener('click', () => {
-    const blob = new Blob([waypointsToText()], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = waypointFileTimestamp() + '_wpkt_radioApp.txt';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  waypointExportBtn.addEventListener('click', async () => {
+    const fileName = waypointFileTimestamp() + '_wpkt_radioApp.txt';
+    const file = new File([waypointsToText()], fileName, { type: 'text/plain' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'Wegpunkte' });
+      } catch (e) {
+        // Nutzer hat den Teilen-Dialog abgebrochen – nichts weiter zu tun
+      }
+    } else {
+      // Fallback für Browser ohne Datei-Unterstützung in der Web Share API
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
   });
 
   waypointImportBtn.addEventListener('click', () => waypointImportInput.click());
