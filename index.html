@@ -370,6 +370,25 @@
   .map-legend svg{width:20px;height:4px;flex-shrink:0;}
   .map-legend line{stroke:var(--btc-orange);stroke-width:3;stroke-linecap:round;}
 
+  .map-distance-badge{
+    position:absolute;
+    left:50%;
+    top:calc(14px + env(safe-area-inset-top, 0px));
+    transform:translateX(-50%);
+    padding:7px 14px;
+    border-radius:20px;
+    background:rgba(15,15,13,.88);
+    border:1px solid #6b3fa0;
+    color:var(--off-white);
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.02em;
+    white-space:nowrap;
+    box-shadow:0 2px 10px rgba(0,0,0,.45);
+    z-index:9;
+    pointer-events:none;
+  }
+
   /* ===== WEGPUNKTE ===== */
   .map-io-btn{
     position:absolute;
@@ -982,6 +1001,8 @@
       <div>Karte wird geladen…</div>
     </div>
 
+    <div class="map-distance-badge" id="mapDistanceBadge">0,0 km heute</div>
+
     <button class="map-io-btn" id="mapIoBtn" aria-label="Wegpunkte exportieren/importieren">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1527,6 +1548,7 @@
         lastKnownPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         lastKnownSpeedKmh = kmh;
         if (typeof updateBikeMapMarker === 'function') updateBikeMapMarker();
+        if (typeof updateDailyTrack === 'function') updateDailyTrack(lastKnownPos.lat, lastKnownPos.lng, kmh);
       },
       () => { compassSpeedEl.textContent = '–'; },
       { enableHighAccuracy:true, maximumAge:2000, timeout:10000 }
@@ -1765,6 +1787,93 @@
       bikeMap.setView([lastKnownPos.lat, lastKnownPos.lng], bikeMap.getZoom(), { animate: true });
     }
   });
+
+  /* ============ TAGES-KILOMETER & GEFAHRENE STRECKE ============ */
+  const MIN_TRACK_SPEED_KMH = 3; // unterhalb dessen wird nicht gezählt (GPS-Zittern im Stand)
+  const mapDistanceBadge = document.getElementById('mapDistanceBadge');
+
+  function todayStr(){
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function haversineMeters(lat1, lng1, lat2, lng2){
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  const DAILY_TRACK_KEY = 'bikeDailyTrack';
+  let dailyDate = todayStr();
+  let dailyDistanceKm = 0;
+  let dailyTrackPoints = [];
+  let dailyTrackLayer = null;
+
+  (function loadDailyTrack(){
+    try {
+      const saved = JSON.parse(localStorage.getItem(DAILY_TRACK_KEY) || 'null');
+      // Nur übernehmen, wenn der gespeicherte Stand noch von heute ist – ist
+      // er älter, bleibt es bei den Startwerten (0 km, leerer Track), womit
+      // der tägliche Reset automatisch passiert, sobald sich das Datum ändert.
+      if (saved && saved.date === dailyDate) {
+        dailyDistanceKm = saved.distanceKm || 0;
+        dailyTrackPoints = Array.isArray(saved.track) ? saved.track : [];
+      }
+    } catch (e) {}
+  })();
+
+  function saveDailyTrack(){
+    try {
+      localStorage.setItem(DAILY_TRACK_KEY, JSON.stringify({
+        date: dailyDate, distanceKm: dailyDistanceKm, track: dailyTrackPoints
+      }));
+    } catch (e) {}
+  }
+
+  function updateDailyDistanceDisplay(){
+    if (mapDistanceBadge) {
+      mapDistanceBadge.textContent = dailyDistanceKm.toFixed(1).replace('.', ',') + ' km heute';
+    }
+  }
+
+  function updateDailyTrackOnMap(){
+    if (!bikeMap) return;
+    if (!dailyTrackLayer) {
+      dailyTrackLayer = L.polyline(dailyTrackPoints, {
+        color: '#a855f7', weight: 4, opacity: .75, lineJoin: 'round'
+      }).addTo(bikeMap);
+    } else {
+      dailyTrackLayer.setLatLngs(dailyTrackPoints);
+    }
+  }
+
+  function updateDailyTrack(lat, lng, kmh){
+    const today = todayStr();
+    if (dailyDate !== today) {
+      // Neuer Tag: Kilometer UND Track automatisch zurücksetzen/löschen.
+      dailyDate = today;
+      dailyDistanceKm = 0;
+      dailyTrackPoints = [];
+      if (dailyTrackLayer) { dailyTrackLayer.setLatLngs([]); }
+    }
+
+    if (kmh > MIN_TRACK_SPEED_KMH) {
+      if (dailyTrackPoints.length > 0) {
+        const [prevLat, prevLng] = dailyTrackPoints[dailyTrackPoints.length - 1];
+        dailyDistanceKm += haversineMeters(prevLat, prevLng, lat, lng) / 1000;
+      }
+      dailyTrackPoints.push([lat, lng]);
+      updateDailyTrackOnMap();
+    }
+
+    saveDailyTrack();
+    updateDailyDistanceDisplay();
+  }
+
+  updateDailyDistanceDisplay();
 
   /* ============ WEGPUNKTE ============ */
   // Hinweis zur Technik: Eine reine Web-App kann keine Datei serverseitig
